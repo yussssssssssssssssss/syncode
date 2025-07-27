@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PopupMenu from "../components/PopupMenu";
+import { BASE_URL } from "../config";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -20,7 +21,7 @@ export default function Dashboard() {
 
   const handleCreateRoom = async () => {
     try {
-      const res = await fetch("/api/room/create", {
+      const res = await fetch(`${BASE_URL}/api/room/create`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

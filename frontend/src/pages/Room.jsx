@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { BASE_URL } from "../config";
 
 export default function Room() {
   const { id } = useParams();
@@ -10,7 +11,7 @@ export default function Room() {
   useEffect(() => {
     const fetchRoom = async () => {
       try {
-        const res = await fetch(`/api/room/${id}`, {
+        const res = await fetch(`${BASE_URL}/api/room/${id}`, {
           credentials: "include",
         });
         if (!res.ok) throw new Error("Failed to fetch room");
