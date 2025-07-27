@@ -14,6 +14,7 @@ function Login() {
     try {
       const res = await fetch(`${BASE_URL}/api/auth/login`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
@@ -21,6 +22,14 @@ function Login() {
       const data = await res.json();
 
       if (res.ok) {
+        // Store user data in localStorage - this was missing!
+        const userData = {
+          id: data.user.id,
+          username: data.user.name, // Note: backend returns 'name', frontend expects 'username'
+          email: data.user.email
+        };
+        localStorage.setItem("user", JSON.stringify(userData));
+        
         // Redirect to dashboard
         navigate("/dashboard");
       } else {
@@ -60,7 +69,7 @@ function Login() {
         </form>
 
         <p className="text-center mt-4 text-sm">
-          Don’t have an account?{" "}
+          Don't have an account?{" "}
           <span
             className="text-orange-600 cursor-pointer hover:underline"
             onClick={() => navigate("/register")}

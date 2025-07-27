@@ -15,11 +15,24 @@ function Register() {
       const res = await fetch(`${BASE_URL}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, password, name }),
       });
       const data = await res.json();
-      if (res.ok) navigate("/dashboard");
-      else alert(data.message || "Registration failed");
+      
+      if (res.ok) {
+        // Store user data in localStorage after successful registration
+        const userData = {
+          id: data.user.id,
+          username: data.user.name, // Note: backend returns 'name', frontend expects 'username'
+          email: data.user.email
+        };
+        localStorage.setItem("user", JSON.stringify(userData));
+        
+        navigate("/dashboard");
+      } else {
+        alert(data.message || "Registration failed");
+      }
     } catch {
       alert("Something went wrong");
     }
