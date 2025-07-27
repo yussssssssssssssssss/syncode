@@ -1,37 +1,40 @@
-import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 
-function Room() {
+export default function Room() {
   const { id } = useParams();
-  const [users, setUsers] = useState([]);
+  const [room, setRoom] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchRoomData = async () => {
-      const res = await fetch(`/api/room/${id}`);
-      const data = await res.json();
-      if (res.ok) setUsers(data.users);
-      else alert("Failed to load room");
+    const fetchRoom = async () => {
+      try {
+        const res = await fetch(`/api/room/${id}`, {
+          credentials: "include",
+        });
+        if (!res.ok) throw new Error("Failed to fetch room");
+        const data = await res.json();
+        setRoom(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
     };
-    fetchRoomData();
+    fetchRoom();
   }, [id]);
 
+  if (loading) return <div className="p-6 text-gray-600">Loading room...</div>;
+  if (error) return <div className="p-6 text-red-500">Error: {error}</div>;
+  if (!room) return <div className="p-6">Room not found</div>;
+
   return (
-    <div className="min-h-screen bg-white p-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">syncode</h1>
-        <div className="bg-pink-200 rounded-full w-10 h-10 flex items-center justify-center text-lg font-bold">M</div>
-      </div>
-
-      <h2 className="text-2xl font-bold mb-2">{users.join(" and ")}</h2>
-      <p className="mb-6 text-gray-600">The above is from the database → the users associated with the room will be displayed</p>
-
-      <div className="border-2 border-pink-400 p-4 rounded bg-pink-100">
-        <h3 className="font-semibold mb-2">Sample code</h3>
-        <code className="block mb-2">// your sample code here</code>
-        <button className="bg-pink-400 text-white px-4 py-2 rounded">Copy Code</button>
-      </div>
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-4">Room: {room.name}</h1>
+      <p className="text-gray-700">Room ID: {room._id}</p>
+      <p className="text-gray-700 mt-2">Participants: {room.participants?.length || 0}</p>
+      {/* You can add a chat, code editor, or room controls here later */}
     </div>
   );
 }
-
-export default Room;
