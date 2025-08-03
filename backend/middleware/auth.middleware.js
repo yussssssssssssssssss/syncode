@@ -15,6 +15,13 @@ const protect = async (req, res, next) => {
     if (!user) return res.status(401).json({ message: 'Invalid token user' });
 
     req.user = user; // attach user to request
+    
+    // Set session data for Socket.IO authentication
+    if (req.session) {
+      req.session.userId = user.id;
+      req.session.userName = user.name || user.email;
+    }
+    
     next();
   } catch (err) {
     console.error('Auth error:', err);

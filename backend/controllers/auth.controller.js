@@ -24,12 +24,27 @@ exports.register = async (req, res) => {
 
     const token = generateToken(user);
 
+    // Set httpOnly cookie for security
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'Strict',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
+
+    // Set non-httpOnly cookie for Socket.IO access
+    res.cookie('socketToken', token, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
+    // Set session data for Socket.IO authentication
+    if (req.session) {
+      req.session.userId = user.id;
+      req.session.userName = user.name;
+    }
 
     res.status(201).json({
       message: 'User registered successfully',
@@ -57,12 +72,27 @@ exports.login = async (req, res) => {
 
     const token = generateToken(user);
 
+    // Set httpOnly cookie for security
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'Strict',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
+
+    // Set non-httpOnly cookie for Socket.IO access
+    res.cookie('socketToken', token, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
+
+    // Set session data for Socket.IO authentication
+    if (req.session) {
+      req.session.userId = user.id;
+      req.session.userName = user.name;
+    }
 
     res.status(200).json({
       message: 'Login successful',
@@ -76,10 +106,23 @@ exports.login = async (req, res) => {
 };
 
 exports.logout = (req, res) => {
+  // Clear session data
+  if (req.session) {
+    req.session.destroy();
+  }
+  
+  // Clear both cookies
   res.clearCookie('token', {
     httpOnly: true,
     sameSite: 'Strict',
     secure: process.env.NODE_ENV === 'production'
   });
+  
+  res.clearCookie('socketToken', {
+    httpOnly: false,
+    sameSite: 'Strict',
+    secure: process.env.NODE_ENV === 'production'
+  });
+  
   res.status(200).json({ message: 'Logged out successfully' });
 };
