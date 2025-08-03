@@ -6,8 +6,10 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
   const [language, setLanguage] = useState('javascript');
   const [theme, setTheme] = useState('vs-dark');
   const [isConnected, setIsConnected] = useState(false);
+  const [output, setOutput] = useState('');
   const editorRef = useRef(null);
   const lastChangeRef = useRef(null);
+  const isLocalChange = useRef(false);
 
   useEffect(() => {
     if (!socket) return;
@@ -16,15 +18,12 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
     socket.on('codeChange', (data) => {
       if (data.userId !== socket.userId && data.roomCode === roomCode) {
         console.log('📝 Received code change from:', data.userName);
+        isLocalChange.current = true;
         setCode(data.code);
-      }
-    });
-
-    // Listen for cursor position updates
-    socket.on('cursorChange', (data) => {
-      if (data.userId !== socket.userId && data.roomCode === roomCode) {
-        // Handle cursor position updates (can be implemented later)
-        console.log('👆 Cursor change from:', data.userName);
+        if (editorRef.current) {
+          editorRef.current.setValue(data.code);
+        }
+        isLocalChange.current = false;
       }
     });
 
@@ -51,6 +50,9 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
         setCode(data.code);
         setLanguage(data.language);
         setTheme(data.theme);
+        if (editorRef.current) {
+          editorRef.current.setValue(data.code);
+        }
       }
     });
 
@@ -58,7 +60,6 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
 
     return () => {
       socket.off('codeChange');
-      socket.off('cursorChange');
       socket.off('languageChange');
       socket.off('themeChange');
       socket.off('codeSync');
@@ -73,8 +74,13 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
     
     // Listen for changes
     editor.onDidChangeModelContent(() => {
+      if (isLocalChange.current) return; // Skip if this is a remote change
+      
       const currentCode = editor.getValue();
       const currentTime = Date.now();
+      
+      // Update local state
+      setCode(currentCode);
       
       // Debounce changes to avoid too many socket emissions
       if (lastChangeRef.current) {
@@ -83,13 +89,14 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
       
       lastChangeRef.current = setTimeout(() => {
         if (socket && isConnected) {
+          console.log('📤 Sending code change to other users');
           socket.emit('codeChange', {
             roomCode,
             code: currentCode,
             timestamp: currentTime
           });
         }
-      }, 300); // 300ms debounce
+      }, 500); // 500ms debounce
     });
   };
 
@@ -115,22 +122,31 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
 
   const handleRunCode = () => {
     try {
-      // Create a safer evaluation environment for JavaScript
+      setOutput(''); // Clear previous output
+      
       if (language === 'javascript') {
-        // Create a sandboxed environment
+        // Create a safer evaluation environment
+        const logs = [];
+        const errors = [];
+        
         const sandbox = {
           console: {
             log: (...args) => {
               const output = args.map(arg => 
                 typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
               ).join(' ');
-              alert(`Console Output:\n${output}`);
+              logs.push(output);
+              console.log('Code Output:', output);
             },
             error: (...args) => {
-              alert(`Error: ${args.join(' ')}`);
+              const output = args.join(' ');
+              errors.push(output);
+              console.error('Code Error:', output);
             },
             warn: (...args) => {
-              alert(`Warning: ${args.join(' ')}`);
+              const output = args.join(' ');
+              logs.push(`WARNING: ${output}`);
+              console.warn('Code Warning:', output);
             }
           },
           setTimeout: setTimeout,
@@ -147,11 +163,18 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
           Boolean: Boolean,
           RegExp: RegExp,
           Error: Error,
-          Promise: Promise
+          Promise: Promise,
+          alert: (msg) => logs.push(`ALERT: ${msg}`),
+          prompt: () => null,
+          confirm: () => false
         };
 
         // Create a function with the sandboxed environment
-        const func = new Function('console', 'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval', 'Date', 'Math', 'JSON', 'Array', 'Object', 'String', 'Number', 'Boolean', 'RegExp', 'Error', 'Promise', code);
+        const func = new Function(
+          'console', 'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval', 
+          'Date', 'Math', 'JSON', 'Array', 'Object', 'String', 'Number', 'Boolean', 
+          'RegExp', 'Error', 'Promise', 'alert', 'prompt', 'confirm', code
+        );
         
         // Execute the function with sandboxed objects
         const result = func(
@@ -159,19 +182,30 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
           sandbox.clearTimeout, sandbox.clearInterval, sandbox.Date, 
           sandbox.Math, sandbox.JSON, sandbox.Array, sandbox.Object, 
           sandbox.String, sandbox.Number, sandbox.Boolean, 
-          sandbox.RegExp, sandbox.Error, sandbox.Promise
+          sandbox.RegExp, sandbox.Error, sandbox.Promise,
+          sandbox.alert, sandbox.prompt, sandbox.confirm
         );
         
-        if (result !== undefined) {
-          alert(`Code executed successfully!\nReturn value: ${result}`);
+        // Display results
+        let outputText = '';
+        if (logs.length > 0) {
+          outputText += `Console Output:\n${logs.join('\n')}\n\n`;
         }
+        if (errors.length > 0) {
+          outputText += `Errors:\n${errors.join('\n')}\n\n`;
+        }
+        if (result !== undefined) {
+          outputText += `Return Value: ${result}`;
+        }
+        
+        setOutput(outputText || 'Code executed successfully (no output)');
+        
       } else {
-        // For other languages, show a message
-        alert(`Code execution is currently only supported for JavaScript.\n\nTo run ${language} code, please use an external compiler or IDE.`);
+        setOutput(`Code execution is currently only supported for JavaScript.\n\nTo run ${language} code, please use an external compiler or IDE.`);
       }
     } catch (error) {
       console.error('Code execution error:', error);
-      alert(`Code execution failed:\n${error.message}`);
+      setOutput(`Code execution failed:\n${error.message}`);
     }
   };
 
@@ -309,6 +343,16 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
           }}
         />
       </div>
+
+      {/* Output Panel */}
+      {output && (
+        <div className="border-t bg-gray-50 p-4">
+          <h3 className="text-sm font-semibold mb-2">Code Output:</h3>
+          <pre className="text-sm bg-white border rounded p-3 overflow-auto max-h-32 whitespace-pre-wrap">
+            {output}
+          </pre>
+        </div>
+      )}
 
       {/* Status Bar */}
       <div className="flex items-center justify-between p-2 bg-gray-100 text-xs text-gray-600 border-t">
