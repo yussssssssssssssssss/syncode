@@ -11,6 +11,17 @@ A real-time collaborative coding platform built with React, Node.js, Express, Po
 - **Role-based Access**: Organiser and participant roles with different permissions
 - **Connection Status**: Visual indicators for WebSocket connection status
 
+### 🚀 Collaborative Code Editor
+- **Monaco Editor**: Professional code editor (same as VS Code)
+- **Real-time Synchronization**: Code changes sync instantly across all participants
+- **Multi-language Support**: JavaScript, TypeScript, Python, Java, C++, C#, PHP, Ruby, Go, Rust, HTML, CSS, JSON, SQL
+- **Theme Support**: Dark, Light, and High Contrast themes
+- **Code Execution**: Run JavaScript code directly in the browser (sandboxed)
+- **File Download**: Save code files locally
+- **Syntax Highlighting**: Full syntax highlighting for all supported languages
+- **Auto-completion**: Intelligent code suggestions and auto-completion
+- **Error Handling**: Real-time error detection and reporting
+
 ### Authentication
 - Email/Password authentication with bcrypt hashing
 - JWT token-based authentication
@@ -28,6 +39,7 @@ A real-time collaborative coding platform built with React, Node.js, Express, Po
 - React 19 with Vite
 - Tailwind CSS for styling
 - Socket.IO Client for real-time communication
+- Monaco Editor for collaborative coding
 - React Router for navigation
 
 ### Backend
@@ -85,15 +97,23 @@ npm run dev
 ## WebSocket Events
 
 ### Client to Server
-- `joinRoom(roomCode)`: Join a specific room
-- `chatMessage(message)`: Send a chat message to room participants
+- `joinRoom(roomCode)` - Join a specific room
+- `chatMessage(message)` - Send a chat message to room participants
+- `codeChange(data)` - Send code changes to other participants
+- `languageChange(data)` - Change programming language
+- `themeChange(data)` - Change editor theme
+- `cursorChange(data)` - Send cursor position updates
 
 ### Server to Client
-- `roomJoined(data)`: Confirmation of successful room join with room data
-- `userJoined(data)`: Notification when a new user joins the room
-- `userLeft(data)`: Notification when a user leaves the room
-- `chatMessage(data)`: Receive chat messages from other participants
-- `error(data)`: Error notifications
+- `roomJoined(data)` - Confirmation of successful room join with room data
+- `userJoined(data)` - Notification when a new user joins the room
+- `userLeft(data)` - Notification when a user leaves the room
+- `chatMessage(data)` - Receive chat messages from other participants
+- `codeChange(data)` - Receive code changes from other participants
+- `languageChange(data)` - Receive language change notifications
+- `themeChange(data)` - Receive theme change notifications
+- `cursorChange(data)` - Receive cursor position updates
+- `error(data)` - Error notifications
 
 ## API Endpoints
 
@@ -123,9 +143,18 @@ npm run dev
 3. Enter the 6-digit room code
 4. You'll be redirected to the room if the code is valid
 
+### Collaborative Coding
+1. **Real-time Editing**: Start typing code and see changes sync instantly
+2. **Language Selection**: Choose from 14+ programming languages
+3. **Theme Customization**: Switch between Dark, Light, and High Contrast themes
+4. **Code Execution**: Run JavaScript code directly in the browser
+5. **File Management**: Download your code as files
+6. **Chat Integration**: Discuss code changes in real-time chat
+
 ### Real-time Features
 - **Live Participants**: See all connected users in real-time
 - **Chat**: Send and receive messages with all room participants
+- **Code Sync**: Real-time code synchronization across all participants
 - **Connection Status**: Monitor your WebSocket connection status
 - **User Notifications**: Get notified when users join or leave
 
@@ -136,6 +165,7 @@ npm run dev
 - **JWT Token Validation**: Secure token-based authentication
 - **Session Management**: Proper session handling for WebSocket connections
 - **CORS Configuration**: Secure cross-origin resource sharing
+- **Code Execution Sandbox**: Safe JavaScript execution environment
 
 ## Development
 
@@ -151,6 +181,7 @@ syncode/
 ├── frontend/
 │   ├── src/
 │   │   ├── components/  # React components
+│   │   │   └── CollaborativeEditor.jsx  # Monaco Editor integration
 │   │   ├── pages/       # Page components
 │   │   └── config.js    # Configuration
 │   └── package.json
@@ -160,7 +191,14 @@ syncode/
 ### Key Implementation Details
 
 #### WebSocket Authentication
-The application uses express-session middleware to authenticate WebSocket connections. When users log in, session data is set and validated for each Socket.IO connection.
+The application uses JWT tokens for Socket.IO authentication. When users log in, both httpOnly and non-httpOnly cookies are set for secure HTTP requests and Socket.IO access respectively.
+
+#### Collaborative Editor
+- **Monaco Editor**: Professional-grade code editor with syntax highlighting
+- **Real-time Sync**: Debounced code change synchronization (300ms)
+- **Multi-language**: Support for 14+ programming languages
+- **Theme Support**: Multiple editor themes
+- **Code Execution**: Sandboxed JavaScript execution
 
 #### Room Management
 - Unique 6-digit alphanumeric room codes are generated
@@ -170,17 +208,21 @@ The application uses express-session middleware to authenticate WebSocket connec
 #### Real-time Updates
 - User join/leave events are broadcast to all room participants
 - Chat messages are sent to all users in the room
+- Code changes are synchronized in real-time
 - Connection status is displayed to users
 
 ## Future Enhancements
 
-- Collaborative code editor with real-time synchronization
-- Screen sharing capabilities
-- Voice/video chat integration
-- File sharing within rooms
-- Room persistence and history
-- User presence indicators
-- Typing indicators for chat
+- **Cursor Tracking**: Show other users' cursor positions
+- **Selection Highlighting**: Highlight other users' text selections
+- **Screen Sharing**: Integrated screen sharing capabilities
+- **Voice/Video Chat**: WebRTC-based communication
+- **File Sharing**: Upload and share files within rooms
+- **Room Persistence**: Save and restore room state
+- **User Presence**: Typing indicators and online status
+- **Code History**: Version control and change history
+- **Multi-file Support**: Multiple files per room
+- **Terminal Integration**: Built-in terminal for code execution
 
 ## Troubleshooting
 
@@ -189,7 +231,7 @@ The application uses express-session middleware to authenticate WebSocket connec
 1. **WebSocket Connection Failed**
    - Ensure backend server is running on port 3000
    - Check CORS configuration
-   - Verify session is properly set after login
+   - Verify JWT token is properly set
 
 2. **Room Join Fails**
    - Verify room code is correct
@@ -200,6 +242,16 @@ The application uses express-session middleware to authenticate WebSocket connec
    - Verify WebSocket connection status
    - Check if user is in the correct room
    - Ensure message is not empty
+
+4. **Code Not Syncing**
+   - Check WebSocket connection status
+   - Verify all users are in the same room
+   - Check browser console for errors
+
+5. **Code Execution Fails**
+   - Ensure code is valid JavaScript
+   - Check for syntax errors
+   - Verify sandbox environment
 
 ### Debug Mode
 Enable debug logging by setting environment variables:

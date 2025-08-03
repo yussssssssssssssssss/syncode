@@ -164,6 +164,55 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Handle code changes
+  socket.on('codeChange', (data) => {
+    if (socket.roomCode && data.roomCode === socket.roomCode) {
+      socket.to(socket.roomCode).emit('codeChange', {
+        userId: socket.userId,
+        userName: socket.userName,
+        roomCode: data.roomCode,
+        code: data.code,
+        timestamp: data.timestamp
+      });
+    }
+  });
+
+  // Handle language changes
+  socket.on('languageChange', (data) => {
+    if (socket.roomCode && data.roomCode === socket.roomCode) {
+      socket.to(socket.roomCode).emit('languageChange', {
+        userId: socket.userId,
+        userName: socket.userName,
+        roomCode: data.roomCode,
+        language: data.language
+      });
+    }
+  });
+
+  // Handle theme changes
+  socket.on('themeChange', (data) => {
+    if (socket.roomCode && data.roomCode === socket.roomCode) {
+      socket.to(socket.roomCode).emit('themeChange', {
+        userId: socket.userId,
+        userName: socket.userName,
+        roomCode: data.roomCode,
+        theme: data.theme
+      });
+    }
+  });
+
+  // Handle cursor position changes (for future cursor tracking)
+  socket.on('cursorChange', (data) => {
+    if (socket.roomCode && data.roomCode === socket.roomCode) {
+      socket.to(socket.roomCode).emit('cursorChange', {
+        userId: socket.userId,
+        userName: socket.userName,
+        roomCode: data.roomCode,
+        position: data.position
+      });
+    }
+  });
+
   // Handle disconnection
   socket.on('disconnect', async () => {
     if (socket.roomCode) {

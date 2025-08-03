@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import { BASE_URL } from "../config";
 import Header from "../components/Header";
+import CollaborativeEditor from "../components/CollaborativeEditor";
 
 export default function Room() {
   const { id: roomCode } = useParams(); // This is actually the room code, not ID
@@ -232,7 +233,7 @@ export default function Room() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Participants List */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow p-6 mb-6">
@@ -252,12 +253,9 @@ export default function Room() {
                 ))}
               </div>
             </div>
-          </div>
 
-          {/* Chat and Main Content */}
-          <div className="lg:col-span-2">
             {/* Chat Section */}
-            <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-lg font-semibold mb-4">Chat</h2>
               <div className="h-64 overflow-y-auto border rounded p-3 mb-4 bg-gray-50">
                 {messages.length === 0 ? (
@@ -307,14 +305,15 @@ export default function Room() {
                 </button>
               </form>
             </div>
+          </div>
 
-            {/* Collaborative Editor Placeholder */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold mb-4">Collaborative Editor</h2>
-              <div className="h-64 bg-gray-100 rounded flex items-center justify-center text-gray-500">
-                Code editor will be implemented here
-              </div>
-            </div>
+          {/* Collaborative Editor */}
+          <div className="lg:col-span-3">
+            <CollaborativeEditor 
+              socket={socket} 
+              roomCode={roomCode} 
+              userRole={userRole} 
+            />
           </div>
         </div>
       </div>
