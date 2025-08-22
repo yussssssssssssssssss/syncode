@@ -198,6 +198,38 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Explicit leave handler (client-requested)
+  socket.on('leaveRoom', async () => {
+    try {
+      if (!socket.roomCode) return;
+      const room = await prisma.room.findUnique({ where: { code: socket.roomCode.toUpperCase() } });
+      if (!room) return;
+
+      // Remove participant entry for this user in this room
+      await prisma.roomParticipant.deleteMany({ where: { roomId: room.id, userId: socket.userId } });
+
+      // Fetch updated participants
+      const remaining = await prisma.roomParticipant.findMany({ where: { roomId: room.id }, include: { user: true } });
+
+      // If no participants remain, delete the room
+      if (remaining.length === 0) {
+        await prisma.room.delete({ where: { id: room.id } });
+      }
+
+      // Emit userLeft to the room
+      socket.to(socket.roomCode).emit('userLeft', {
+        user: { id: socket.userId, name: socket.userName, role: socket.userRole },
+        participants: remaining.map(p => ({ id: p.user.id, name: p.user.name, email: p.user.email, role: p.role }))
+      });
+
+      // Make socket leave the room
+      socket.leave(socket.roomCode);
+      delete socket.roomCode;
+    } catch (err) {
+      console.error('Error handling leaveRoom:', err);
+    }
+  });
+
   // Handle chat messages
   socket.on('chatMessage', (message) => {
     if (socket.roomCode) {
@@ -284,33 +316,29 @@ io.on('connection', (socket) => {
     }
     if (socket.roomCode) {
       try {
-        // Get updated participants list
-        const room = await prisma.room.findUnique({
-          where: { code: socket.roomCode },
-          include: {
-            participants: {
-              include: { user: true }
+        // If user has other active sockets, don't remove their participant entry
+        const remainingSockets = userSockets.get(socket.userId) || [];
+        if (remainingSockets.length === 0) {
+          // Find the room by code
+          const room = await prisma.room.findUnique({ where: { code: socket.roomCode.toUpperCase() } });
+          if (room) {
+            // Remove participant record for this user
+            await prisma.roomParticipant.deleteMany({ where: { roomId: room.id, userId: socket.userId } });
+
+            // Fetch updated participants
+            const remaining = await prisma.roomParticipant.findMany({ where: { roomId: room.id }, include: { user: true } });
+
+            // If no participants remain, delete the room
+            if (remaining.length === 0) {
+              await prisma.room.delete({ where: { id: room.id } });
             }
+
+            // Emit user left event
+            socket.to(socket.roomCode).emit('userLeft', {
+              user: { id: socket.userId, name: socket.userName, role: socket.userRole },
+              participants: remaining.map(p => ({ id: p.user.id, name: p.user.name, email: p.user.email, role: p.role }))
+            });
           }
-        });
-
-        if (room) {
-          const participants = room.participants.map(p => ({
-            id: p.user.id,
-            name: p.user.name,
-            email: p.user.email,
-            role: p.role
-          }));
-
-          // Emit user left event
-          socket.to(socket.roomCode).emit('userLeft', {
-            user: {
-              id: socket.userId,
-              name: socket.userName,
-              role: socket.userRole
-            },
-            participants
-          });
         }
 
         console.log(`User ${socket.userName} left room ${socket.roomCode}`);

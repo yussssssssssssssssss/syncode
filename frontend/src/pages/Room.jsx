@@ -10,6 +10,7 @@ export default function Room() {
   const { id: roomCode } = useParams(); // This is actually the room code, not ID
   const [room, setRoom] = useState(null);
   const [users, setUsers] = useState([]);
+  const [initialSync, setInitialSync] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [socket, setSocket] = useState(null);
@@ -160,6 +161,17 @@ export default function Room() {
           }
         });
 
+        socketInstance.on('userLeft', (data) => {
+          console.log('User left:', data.user);
+          // update participants list from server payload when available
+          if (data.participants) setUsers(data.participants);
+          setMessages(prev => [...prev, {
+            type: 'system',
+            message: `${data.user.name} left the room`,
+            timestamp: new Date().toISOString()
+          }]);
+        });
+
         // WebRTC signaling handlers
     socketInstance.on('webrtc-offer', async ({ from, sdp, fromUserId }) => {
           try {
@@ -235,7 +247,47 @@ export default function Room() {
           setError(error.message);
         });
 
-        setSocket(socketInstance);
+        // receive room editor snapshot (server may emit this on join)
+        socketInstance.on('codeSync', (data) => {
+          try {
+            if (data?.roomCode === roomCode) {
+              // store initial sync so editor can apply even if its socket handler hasn't mounted yet
+              setInitialSync({ code: data.code, language: data.language, theme: data.theme });
+            }
+          } catch (e) {
+            console.error('Error handling codeSync in Room:', e);
+          }
+        });
+
+        // Ensure we remove participant when page is closed/reloaded
+        const handleBeforeUnload = (e) => {
+          try {
+            if (socketInstance && socketInstance.connected) {
+              // best-effort notify server that we're leaving
+              socketInstance.emit('leaveRoom');
+              // close the socket to trigger server disconnect logic faster
+              socketInstance.disconnect();
+            }
+          } catch (err) {
+            // swallow errors during unload
+          }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        // pagehide is more reliable on mobile/browsers
+        window.addEventListener('pagehide', handleBeforeUnload);
+
+        // store socket into state so other effects can use it
+
+  setSocket(socketInstance);
+
+        // Cleanup unload listeners when this effect unmounts (socketInstance captured)
+        const cleanupUnload = () => {
+          try {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            window.removeEventListener('pagehide', handleBeforeUnload);
+          } catch (e) {}
+        };
 
       } catch (err) {
         console.error("❌ Room join error:", err);
@@ -267,6 +319,8 @@ export default function Room() {
         localStreamRef.current.getTracks().forEach(t => t.stop());
         localStreamRef.current = null;
       }
+  // remove unload handlers if any
+  try { cleanupUnload && cleanupUnload(); } catch(e){}
     };
   }, [roomCode, navigate]);
 
@@ -516,11 +570,16 @@ export default function Room() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+  <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Participants List */}
           <div className="lg:col-span-1">
             <div className="bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg shadow p-6 mb-6 border border-slate-200 dark:border-slate-700 transition-colors">
-              <h2 className="text-lg font-semibold mb-4">Participants ({users.length})</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold mb-4">Participants ({users.length})</h2>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { if (socket) socket.emit('leaveRoom'); navigate('/dashboard'); }} className="px-3 py-1 text-sm rounded bg-red-600 text-white hover:bg-red-700">Leave</button>
+                </div>
+              </div>
               <div className="space-y-2">
                 {users.map((user) => (
                   <div key={user.id} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-slate-900/40 rounded">
@@ -592,11 +651,14 @@ export default function Room() {
 
           {/* Collaborative Editor */}
           <div className="lg:col-span-3">
-            <CollaborativeEditor 
-              socket={socket} 
-              roomCode={roomCode} 
-              userRole={userRole} 
-            />
+            <div className="min-h-[60vh]">
+                <CollaborativeEditor 
+                  socket={socket} 
+                  roomCode={roomCode} 
+                  userRole={userRole}
+                  initialSync={initialSync}
+                />
+            </div>
           </div>
         </div>
       </div>

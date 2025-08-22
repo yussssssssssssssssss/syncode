@@ -115,7 +115,7 @@ body { font-family: sans-serif; }`,
 SELECT 2 * 2 AS result;`,
 };
 
-const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
+const CollaborativeEditor = ({ socket, roomCode, userRole, initialSync = null }) => {
   const [language, setLanguage] = useState('javascript');
   const [code, setCode] = useState(TEMPLATES['javascript']);
   const [theme, setTheme] = useState(() =>
@@ -194,6 +194,19 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
         editorRef.current?.setValue(data.code);
       }
     });
+
+    // Also apply any initial sync provided by parent (e.g., received before editor mounted)
+    if (initialSync && initialSync.code) {
+      try {
+        setCode(initialSync.code);
+        if (initialSync.language) setLanguage(initialSync.language);
+        if (initialSync.theme) setTheme(initialSync.theme);
+        // apply to editor if mounted
+        editorRef.current?.setValue(initialSync.code);
+      } catch (e) {
+        console.error('Error applying initialSync:', e);
+      }
+    }
 
     return () => {
       socket.off('connect', handleConnect);
