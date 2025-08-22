@@ -180,8 +180,24 @@ export default function Room() {
   const sendMessage = (e) => {
     e.preventDefault();
     if (newMessage.trim() && socket && connected) {
-      console.log("📤 Sending message:", newMessage.trim());
-      socket.emit("chatMessage", newMessage.trim());
+      const messageText = newMessage.trim();
+      console.log("📤 Sending message:", messageText);
+      
+      // Add user's own message to local state immediately
+      const ownMessage = {
+        type: "chat",
+        user: {
+          id: socket.userId || 'self',
+          name: socket.userName || 'You',
+          role: userRole
+        },
+        message: messageText,
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, ownMessage]);
+      
+      // Send to server
+      socket.emit("chatMessage", messageText);
       setNewMessage("");
     }
   };

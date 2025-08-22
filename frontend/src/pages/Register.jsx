@@ -1,60 +1,243 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import InputField from "../components/InputField";
+import { useNavigate, Link } from "react-router-dom";
 import { BASE_URL } from "../config";
 
-function Register() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setUsername] = useState("");
+export default function Register() {
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: ""
+  });
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [generalError, setGeneralError] = useState("");
   const navigate = useNavigate();
 
-  const handleRegister = async (e) => {
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.name.trim()) {
+      newErrors.name = "Name is required";
+    } else if (formData.name.trim().length < 2) {
+      newErrors.name = "Name must be at least 2 characters";
+    }
+    
+    if (!formData.email.trim()) {
+      newErrors.email = "Email is required";
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = "Please enter a valid email";
+    }
+    
+    if (!formData.password) {
+      newErrors.password = "Password is required";
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters";
+    }
+    
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = "Please confirm your password";
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match";
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setGeneralError("");
+    
+    if (!validateForm()) return;
+    
+    setLoading(true);
     try {
       const res = await fetch(`${BASE_URL}/api/auth/register`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, password, name }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          password: formData.password
+        }),
       });
+
       const data = await res.json();
-      
+
       if (res.ok) {
-        // Store user data in localStorage after successful registration
-        const userData = {
-          id: data.user.id,
-          username: data.user.name, // Note: backend returns 'name', frontend expects 'username'
-          email: data.user.email
-        };
-        localStorage.setItem("user", JSON.stringify(userData));
-        
+        localStorage.setItem("user", JSON.stringify(data.user));
         navigate("/dashboard");
       } else {
-        alert(data.message || "Registration failed");
+        setGeneralError(data.message || "Registration failed. Please try again.");
       }
-    } catch {
-      alert("Something went wrong");
+    } catch (err) {
+      console.error("Registration error:", err);
+      setGeneralError("Network error. Please check your connection.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Clear field-specific error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: "" }));
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md p-8 border-2 border-black rounded-xl shadow-md bg-white">
-        <h1 className="text-4xl font-bold text-center mb-2">syncode</h1>
-        <p className="text-center mb-6 text-gray-600">a collaborative text editor</p>
-        <form onSubmit={handleRegister} className="space-y-4">
-          <InputField placeholder="Enter Username" value={name} onChange={(e) => setUsername(e.target.value)} />
-          <InputField type="email" placeholder="Enter Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <InputField type="password" placeholder="Enter Password" value={password} onChange={(e) => setPassword(e.target.value)} />
-          <button type="submit" className="w-full py-2 px-4 rounded-md bg-yellow-300 text-black font-semibold border-2 border-black hover:bg-yellow-400 transition">Create Account</button>
-        </form>
-        <p className="text-center mt-4 text-sm">
-          Already have an account? <span className="text-blue-600 cursor-pointer hover:underline" onClick={() => navigate("/login")}>LOGIN</span>
-        </p>
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center px-4">
+      <div className="max-w-md w-full">
+        <div className="bg-white rounded-2xl shadow-xl p-8">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
+            <p className="text-gray-600">Join Syncode and start coding collaboratively</p>
+          </div>
+
+          {/* Error Display */}
+          {generalError && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-red-800">{generalError}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Registration Form */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                Full Name
+              </label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors ${
+                  errors.name ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
+                }`}
+                placeholder="Enter your full name"
+                disabled={loading}
+              />
+              {errors.name && (
+                <p className="mt-2 text-sm text-red-600">{errors.name}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                Email Address
+              </label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors ${
+                  errors.email ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
+                }`}
+                placeholder="Enter your email"
+                disabled={loading}
+              />
+              {errors.email && (
+                <p className="mt-2 text-sm text-red-600">{errors.email}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                Password
+              </label>
+              <input
+                type="password"
+                id="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors ${
+                  errors.password ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
+                }`}
+                placeholder="Create a password"
+                disabled={loading}
+              />
+              {errors.password && (
+                <p className="mt-2 text-sm text-red-600">{errors.password}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                Confirm Password
+              </label>
+              <input
+                type="password"
+                id="confirmPassword"
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors ${
+                  errors.confirmPassword ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
+                }`}
+                placeholder="Confirm your password"
+                disabled={loading}
+              />
+              {errors.confirmPassword && (
+                <p className="mt-2 text-sm text-red-600">{errors.confirmPassword}</p>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className={`w-full py-3 px-4 border border-transparent rounded-lg font-medium text-white transition-colors ${
+                loading
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2'
+              }`}
+            >
+              {loading ? (
+                <div className="flex items-center justify-center">
+                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Creating account...
+                </div>
+              ) : (
+                'Create Account'
+              )}
+            </button>
+          </form>
+
+          {/* Footer */}
+          <div className="mt-8 text-center">
+            <p className="text-gray-600">
+              Already have an account?{" "}
+              <Link to="/login" className="font-medium text-green-600 hover:text-green-500 transition-colors">
+                Sign in here
+              </Link>
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
-
-export default Register;

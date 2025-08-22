@@ -7,7 +7,7 @@ A real-time collaborative coding platform built with React, Node.js, Express, Po
 ### Real-time WebSocket Functionality
 - **Room Management**: Create and join rooms with unique 6-digit alphanumeric codes
 - **Live User Updates**: Real-time participant join/leave notifications
-- **Chat System**: Bi-directional messaging between room participants
+- **Chat System**: Bi-directional messaging between room participants with instant visibility
 - **Role-based Access**: Organiser and participant roles with different permissions
 - **Connection Status**: Visual indicators for WebSocket connection status
 
@@ -16,7 +16,12 @@ A real-time collaborative coding platform built with React, Node.js, Express, Po
 - **Real-time Synchronization**: Code changes sync instantly across all participants
 - **Multi-language Support**: JavaScript, TypeScript, Python, Java, C++, C#, PHP, Ruby, Go, Rust, HTML, CSS, JSON, SQL
 - **Theme Support**: Dark, Light, and High Contrast themes
-- **Code Execution**: Run JavaScript code directly in the browser (sandboxed)
+- **Code Execution**: 
+  - JavaScript: Run directly in browser (sandboxed)
+  - HTML: Preview in new tab
+  - CSS: Apply to current page temporarily
+  - JSON: Validation and formatting
+  - Other languages: External compilation via Judge0 API
 - **File Download**: Save code files locally
 - **Syntax Highlighting**: Full syntax highlighting for all supported languages
 - **Auto-completion**: Intelligent code suggestions and auto-completion
@@ -27,6 +32,8 @@ A real-time collaborative coding platform built with React, Node.js, Express, Po
 - JWT token-based authentication
 - Session management for WebSocket connections
 - Secure cookie handling
+- Form validation and error handling
+- Loading states and user feedback
 
 ### Database Schema
 - **Users**: User accounts with email, password, and profile information
@@ -58,6 +65,7 @@ A real-time collaborative coding platform built with React, Node.js, Express, Po
 - Node.js (v18 or higher)
 - PostgreSQL database
 - npm or yarn package manager
+- RapidAPI account (for external compilation)
 
 ### Backend Setup
 ```bash
@@ -89,6 +97,21 @@ cd frontend
 npm install
 ```
 
+#### External Compilation Setup (Optional)
+To enable code execution for languages other than JavaScript:
+
+1. Sign up for a free account at [RapidAPI](https://rapidapi.com/)
+2. Subscribe to the [Judge0 CE API](https://rapidapi.com/judge0-official/api/judge0-ce)
+3. Copy your API key from the RapidAPI dashboard
+4. Update `frontend/src/config.js`:
+```javascript
+export const JUDGE0_CONFIG = {
+  API_URL: 'https://judge0-ce.p.rapidapi.com',
+  API_KEY: 'your-actual-api-key-here',
+  HOST: 'judge0-ce.p.rapidapi.com'
+};
+```
+
 Start the development server:
 ```bash
 npm run dev
@@ -113,6 +136,7 @@ npm run dev
 - `languageChange(data)` - Receive language change notifications
 - `themeChange(data)` - Receive theme change notifications
 - `cursorChange(data)` - Receive cursor position updates
+- `codeSync(data)` - Initial code synchronization for new users
 - `error(data)` - Error notifications
 
 ## API Endpoints
@@ -147,13 +171,17 @@ npm run dev
 1. **Real-time Editing**: Start typing code and see changes sync instantly
 2. **Language Selection**: Choose from 14+ programming languages
 3. **Theme Customization**: Switch between Dark, Light, and High Contrast themes
-4. **Code Execution**: Run JavaScript code directly in the browser
+4. **Code Execution**: 
+   - JavaScript: Run directly in browser
+   - HTML: Preview in new tab
+   - CSS: Apply temporarily to page
+   - Other languages: Use external compilation (requires API key)
 5. **File Management**: Download your code as files
 6. **Chat Integration**: Discuss code changes in real-time chat
 
 ### Real-time Features
 - **Live Participants**: See all connected users in real-time
-- **Chat**: Send and receive messages with all room participants
+- **Chat**: Send and receive messages with all room participants (including your own)
 - **Code Sync**: Real-time code synchronization across all participants
 - **Connection Status**: Monitor your WebSocket connection status
 - **User Notifications**: Get notified when users join or leave
@@ -195,71 +223,40 @@ The application uses JWT tokens for Socket.IO authentication. When users log in,
 
 #### Collaborative Editor
 - **Monaco Editor**: Professional-grade code editor with syntax highlighting
-- **Real-time Sync**: Debounced code change synchronization (300ms)
+- **Real-time Sync**: Debounced code change synchronization (500ms)
 - **Multi-language**: Support for 14+ programming languages
 - **Theme Support**: Multiple editor themes
-- **Code Execution**: Sandboxed JavaScript execution
+- **External Compilation**: Integration with Judge0 CE API for non-JavaScript languages
 
-#### Room Management
-- Unique 6-digit alphanumeric room codes are generated
-- Users are automatically added as participants when creating/joining rooms
-- Role-based access (organiser vs participant)
+#### Chat System
+- **Instant Visibility**: User's own messages appear immediately in local state
+- **Real-time Sync**: Messages broadcast to all room participants
+- **System Messages**: Automatic notifications for user join/leave events
 
-#### Real-time Updates
-- User join/leave events are broadcast to all room participants
-- Chat messages are sent to all users in the room
-- Code changes are synchronized in real-time
-- Connection status is displayed to users
-
-## Future Enhancements
-
-- **Cursor Tracking**: Show other users' cursor positions
-- **Selection Highlighting**: Highlight other users' text selections
-- **Screen Sharing**: Integrated screen sharing capabilities
-- **Voice/Video Chat**: WebRTC-based communication
-- **File Sharing**: Upload and share files within rooms
-- **Room Persistence**: Save and restore room state
-- **User Presence**: Typing indicators and online status
-- **Code History**: Version control and change history
-- **Multi-file Support**: Multiple files per room
-- **Terminal Integration**: Built-in terminal for code execution
+#### Code Execution
+- **JavaScript**: Sandboxed execution in browser
+- **HTML/CSS**: Live preview capabilities
+- **External Languages**: Compilation and execution via Judge0 CE API
+- **Error Handling**: Comprehensive error reporting and status updates
 
 ## Troubleshooting
 
-### Common Issues
+### Chat Messages Not Visible
+- Ensure you're connected to the WebSocket server (green "Connected" status)
+- Check browser console for any error messages
+- Verify that the backend server is running
 
-1. **WebSocket Connection Failed**
-   - Ensure backend server is running on port 3000
-   - Check CORS configuration
-   - Verify JWT token is properly set
+### Code Sync Issues
+- Check WebSocket connection status
+- Ensure all users are in the same room
+- Verify that the backend is properly storing room states
 
-2. **Room Join Fails**
-   - Verify room code is correct
-   - Ensure user is authenticated
-   - Check database connection
+### External Compilation Not Working
+- Verify your RapidAPI key is correctly set in `frontend/src/config.js`
+- Check that you're subscribed to the Judge0 CE API
+- Ensure your API key has sufficient quota for the current month
 
-3. **Chat Messages Not Sending**
-   - Verify WebSocket connection status
-   - Check if user is in the correct room
-   - Ensure message is not empty
-
-4. **Code Not Syncing**
-   - Check WebSocket connection status
-   - Verify all users are in the same room
-   - Check browser console for errors
-
-5. **Code Execution Fails**
-   - Ensure code is valid JavaScript
-   - Check for syntax errors
-   - Verify sandbox environment
-
-### Debug Mode
-Enable debug logging by setting environment variables:
-```env
-DEBUG=socket.io:*
-NODE_ENV=development
-```
-
-## License
-
-This project is licensed under the MIT License. 
+### CORS Errors
+- Verify that your frontend port is included in the backend CORS configuration
+- Check that both frontend and backend are running on the expected ports
+- Restart the backend server after making CORS changes 

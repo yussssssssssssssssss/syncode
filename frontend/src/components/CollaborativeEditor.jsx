@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
+import { JUDGE0_CONFIG } from '../config';
 
 const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
   const [code, setCode] = useState('// Welcome to Syncode!\n// Start coding collaboratively with your team.\n\nfunction helloWorld() {\n  console.log("Hello from Syncode!");\n  return "Collaborative coding is awesome!";\n}\n\n// Try editing this code and see it sync in real-time!');
@@ -7,12 +8,44 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
   const [theme, setTheme] = useState('vs-dark');
   const [isConnected, setIsConnected] = useState(false);
   const [output, setOutput] = useState('');
+  const [compiling, setCompiling] = useState(false);
   const editorRef = useRef(null);
   const lastChangeRef = useRef(null);
   const isLocalChange = useRef(false);
+  const socketRef = useRef(null);
+
+  // Judge0 API configuration for external compilation
+  const JUDGE0_API_URL = JUDGE0_CONFIG.API_URL;
+  const JUDGE0_API_KEY = JUDGE0_CONFIG.API_KEY;
+  
+  // Language ID mapping for Judge0 API
+  const languageIds = {
+    'javascript': 63, // Node.js
+    'typescript': 74, // TypeScript
+    'python': 71,     // Python 3
+    'java': 62,       // Java
+    'cpp': 54,        // C++17
+    'csharp': 51,     // C#
+    'php': 68,        // PHP
+    'ruby': 72,       // Ruby
+    'go': 60,         // Go
+    'rust': 73,       // Rust
+    'html': 83,       // HTML
+    'css': 52,        // CSS
+    'json': 82,       // JSON
+    'sql': 82         // SQL (using JSON as fallback)
+  };
 
   useEffect(() => {
+    // Keep a fresh reference to the socket to avoid stale closures in editor handlers
+    socketRef.current = socket || null;
     if (!socket) return;
+
+    // Track actual socket connection state
+    const handleConnect = () => setIsConnected(true);
+    const handleDisconnect = () => setIsConnected(false);
+    socket.on('connect', handleConnect);
+    socket.on('disconnect', handleDisconnect);
 
     // Listen for code changes from other users
     socket.on('codeChange', (data) => {
@@ -56,9 +89,9 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
       }
     });
 
-    setIsConnected(true);
-
     return () => {
+      socket.off('connect', handleConnect);
+      socket.off('disconnect', handleDisconnect);
       socket.off('codeChange');
       socket.off('languageChange');
       socket.off('themeChange');
@@ -75,22 +108,23 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
     // Listen for changes
     editor.onDidChangeModelContent(() => {
       if (isLocalChange.current) return; // Skip if this is a remote change
-      
+
       const currentCode = editor.getValue();
       const currentTime = Date.now();
-      
+
       // Update local state
       setCode(currentCode);
-      
+
       // Debounce changes to avoid too many socket emissions
       if (lastChangeRef.current) {
         clearTimeout(lastChangeRef.current);
       }
-      
+
       lastChangeRef.current = setTimeout(() => {
-        if (socket && isConnected) {
+        const activeSocket = socketRef.current;
+        if (activeSocket && activeSocket.connected) {
           console.log('📤 Sending code change to other users');
-          socket.emit('codeChange', {
+          activeSocket.emit('codeChange', {
             roomCode,
             code: currentCode,
             timestamp: currentTime
@@ -102,8 +136,9 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
 
   const handleLanguageChange = (newLanguage) => {
     setLanguage(newLanguage);
-    if (socket && isConnected) {
-      socket.emit('languageChange', {
+    const activeSocket = socketRef.current;
+    if (activeSocket && activeSocket.connected) {
+      activeSocket.emit('languageChange', {
         roomCode,
         language: newLanguage
       });
@@ -112,20 +147,22 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
 
   const handleThemeChange = (newTheme) => {
     setTheme(newTheme);
-    if (socket && isConnected) {
-      socket.emit('themeChange', {
+    const activeSocket = socketRef.current;
+    if (activeSocket && activeSocket.connected) {
+      activeSocket.emit('themeChange', {
         roomCode,
         theme: newTheme
       });
     }
   };
 
-  const handleRunCode = () => {
+  const handleRunCode = async () => {
     try {
-      setOutput(''); // Clear previous output
+      setOutput('');
+      setCompiling(true);
       
       if (language === 'javascript') {
-        // Create a safer evaluation environment
+        // Local JavaScript execution (existing logic)
         const logs = [];
         const errors = [];
         
@@ -169,14 +206,12 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
           confirm: () => false
         };
 
-        // Create a function with the sandboxed environment
         const func = new Function(
           'console', 'setTimeout', 'setInterval', 'clearTimeout', 'clearInterval', 
           'Date', 'Math', 'JSON', 'Array', 'Object', 'String', 'Number', 'Boolean', 
           'RegExp', 'Error', 'Promise', 'alert', 'prompt', 'confirm', code
         );
         
-        // Execute the function with sandboxed objects
         const result = func(
           sandbox.console, sandbox.setTimeout, sandbox.setInterval, 
           sandbox.clearTimeout, sandbox.clearInterval, sandbox.Date, 
@@ -186,7 +221,6 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
           sandbox.alert, sandbox.prompt, sandbox.confirm
         );
         
-        // Display results
         let outputText = '';
         if (logs.length > 0) {
           outputText += `Console Output:\n${logs.join('\n')}\n\n`;
@@ -200,12 +234,145 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
         
         setOutput(outputText || 'Code executed successfully (no output)');
         
+      } else if (language === 'html') {
+        // HTML preview
+        const htmlContent = code;
+        const newWindow = window.open('', '_blank');
+        newWindow.document.write(htmlContent);
+        newWindow.document.close();
+        setOutput('HTML opened in new tab for preview');
+        
+      } else if (language === 'css') {
+        // CSS preview (apply to current page temporarily)
+        const styleId = 'temp-css-preview';
+        let existingStyle = document.getElementById(styleId);
+        if (existingStyle) {
+          existingStyle.remove();
+        }
+        
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = code;
+        document.head.appendChild(style);
+        
+        setOutput('CSS applied to current page temporarily. Refresh to remove.');
+        
+        // Remove after 10 seconds
+        setTimeout(() => {
+          if (style.parentNode) {
+            style.remove();
+          }
+        }, 10000);
+        
+      } else if (language === 'json') {
+        // JSON validation
+        try {
+          const parsed = JSON.parse(code);
+          setOutput(`Valid JSON:\n${JSON.stringify(parsed, null, 2)}`);
+        } catch (error) {
+          setOutput(`Invalid JSON: ${error.message}`);
+        }
+        
+      } else if (language === 'sql') {
+        setOutput('SQL execution requires a database connection. Please use an external SQL client.');
+        
       } else {
-        setOutput(`Code execution is currently only supported for JavaScript.\n\nTo run ${language} code, please use an external compiler or IDE.`);
+        // External compilation for other languages
+        if (JUDGE0_API_KEY === 'your-rapidapi-key') {
+          setOutput(`External compilation not configured for ${language}.\n\nTo enable compilation:\n1. Get a RapidAPI key from https://rapidapi.com/judge0-official/api/judge0-ce\n2. Update JUDGE0_API_KEY in the code\n3. Restart the application`);
+          return;
+        }
+        
+        const languageId = languageIds[language];
+        if (!languageId) {
+          setOutput(`Language ${language} is not supported for external compilation.`);
+          return;
+        }
+        
+        setOutput(`Compiling ${language} code...`);
+        
+        // Submit code for compilation
+        const submitResponse = await fetch(`${JUDGE0_API_URL}/submissions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-RapidAPI-Key': JUDGE0_API_KEY,
+            'X-RapidAPI-Host': JUDGE0_CONFIG.HOST
+          },
+          body: JSON.stringify({
+            source_code: code,
+            language_id: languageId,
+            stdin: ''
+          })
+        });
+        
+        if (!submitResponse.ok) {
+          throw new Error(`Failed to submit code: ${submitResponse.statusText}`);
+        }
+        
+        const submitData = await submitResponse.json();
+        const token = submitData.token;
+        
+        // Poll for results
+        let attempts = 0;
+        const maxAttempts = 30;
+        
+        while (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          const resultResponse = await fetch(`${JUDGE0_API_URL}/submissions/${token}`, {
+            headers: {
+              'X-RapidAPI-Key': JUDGE0_API_KEY,
+              'X-RapidAPI-Host': JUDGE0_CONFIG.HOST
+            }
+          });
+          
+          if (!resultResponse.ok) {
+            throw new Error(`Failed to get results: ${resultResponse.statusText}`);
+          }
+          
+          const resultData = await resultResponse.json();
+          
+          if (resultData.status && resultData.status.id > 2) {
+            // Compilation/execution completed
+            let outputText = '';
+            
+            if (resultData.status.id === 3) {
+              // Accepted
+              outputText = `✅ Code executed successfully!\n\nOutput:\n${resultData.stdout || '(no output)'}`;
+              if (resultData.stderr) {
+                outputText += `\n\nWarnings:\n${resultData.stderr}`;
+              }
+            } else if (resultData.status.id === 4) {
+              // Wrong Answer
+              outputText = `❌ Wrong Answer\n\nExpected output doesn't match actual output.`;
+            } else if (resultData.status.id === 5) {
+              // Time Limit Exceeded
+              outputText = `⏰ Time Limit Exceeded\n\nYour code took too long to execute.`;
+            } else if (resultData.status.id === 6) {
+              // Compilation Error
+              outputText = `🔨 Compilation Error\n\n${resultData.compile_output || 'Unknown compilation error'}`;
+            } else {
+              outputText = `❌ Execution Error\n\nStatus: ${resultData.status.description}\n\nError: ${resultData.stderr || 'Unknown error'}`;
+            }
+            
+            setOutput(outputText);
+            break;
+          }
+          
+          attempts++;
+        }
+        
+        if (attempts >= maxAttempts) {
+          setOutput('⏰ Compilation timeout. Please try again.');
+        }
       }
+      
     } catch (error) {
       console.error('Code execution error:', error);
       setOutput(`Code execution failed:\n${error.message}`);
+    } finally {
+      setCompiling(false);
     }
   };
 
@@ -290,9 +457,24 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
           
           <button
             onClick={handleRunCode}
-            className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+            disabled={compiling}
+            className={`px-3 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors ${
+              compiling 
+                ? 'bg-gray-400 cursor-not-allowed' 
+                : 'bg-green-500 hover:bg-green-600 text-white'
+            }`}
           >
-            Run Code
+            {compiling ? (
+              <div className="flex items-center space-x-2">
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Compiling...</span>
+              </div>
+            ) : (
+              'Run Code'
+            )}
           </button>
           
           <button
@@ -329,7 +511,6 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
             selectOnLineNumbers: true,
             readOnly: false,
             cursorStyle: 'line',
-            automaticLayout: true,
             contextmenu: true,
             mouseWheelZoom: true,
             quickSuggestions: true,

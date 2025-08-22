@@ -23,6 +23,9 @@ const io = new Server(server, {
 
 const PORT = 3000;
 const prisma = new PrismaClient();
+// In-memory per-room state for code editor
+// Stores last known { code, language, theme }
+const roomStates = new Map();
 
 // Session middleware for HTTP requests
 app.use(session({
@@ -142,6 +145,17 @@ io.on('connection', (socket) => {
         userRole: socket.userRole
       });
 
+      // Send current editor state snapshot if available
+      const existingState = roomStates.get(roomCode);
+      if (existingState) {
+        socket.emit('codeSync', {
+          roomCode,
+          code: existingState.code,
+          language: existingState.language,
+          theme: existingState.theme
+        });
+      }
+
       console.log(`User ${socket.userName} joined room ${roomCode}`);
     } catch (error) {
       console.error('Error joining room:', error);
@@ -167,6 +181,9 @@ io.on('connection', (socket) => {
   // Handle code changes
   socket.on('codeChange', (data) => {
     if (socket.roomCode && data.roomCode === socket.roomCode) {
+      // Persist last known code state for this room
+      const currentState = roomStates.get(socket.roomCode) || { code: '', language: 'javascript', theme: 'vs-dark' };
+      roomStates.set(socket.roomCode, { ...currentState, code: data.code });
       socket.to(socket.roomCode).emit('codeChange', {
         userId: socket.userId,
         userName: socket.userName,
@@ -180,6 +197,9 @@ io.on('connection', (socket) => {
   // Handle language changes
   socket.on('languageChange', (data) => {
     if (socket.roomCode && data.roomCode === socket.roomCode) {
+      // Persist language in room state
+      const currentState = roomStates.get(socket.roomCode) || { code: '', language: 'javascript', theme: 'vs-dark' };
+      roomStates.set(socket.roomCode, { ...currentState, language: data.language });
       socket.to(socket.roomCode).emit('languageChange', {
         userId: socket.userId,
         userName: socket.userName,
@@ -192,6 +212,9 @@ io.on('connection', (socket) => {
   // Handle theme changes
   socket.on('themeChange', (data) => {
     if (socket.roomCode && data.roomCode === socket.roomCode) {
+      // Persist theme in room state
+      const currentState = roomStates.get(socket.roomCode) || { code: '', language: 'javascript', theme: 'vs-dark' };
+      roomStates.set(socket.roomCode, { ...currentState, theme: data.theme });
       socket.to(socket.roomCode).emit('themeChange', {
         userId: socket.userId,
         userName: socket.userName,
