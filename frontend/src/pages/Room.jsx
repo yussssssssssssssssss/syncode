@@ -109,26 +109,55 @@ export default function Room() {
           console.log("✅ Joined room:", data);
           setUsers(data.participants);
           setUserRole(data.userRole);
-          // create peer connections for existing participants
-          setTimeout(() => {
-            if (!socketInstance) return;
+          // Ensure negotiation: create peers as offerer towards other connected sockets
+          try {
             const meId = socketInstance.id;
             data.participants.forEach(p => {
               if (p.socketId && p.socketId !== meId && !pcsRef.current.has(p.socketId)) {
-                createPeer(p.socketId, socketInstance, false);
+                // Create as offerer so we initiate negotiation
+                console.log('Creating peer (offerer) for existing participant', p.socketId);
+                const pc = createPeer(p.socketId, socketInstance, true);
+                // add our local tracks if available and not muted
+                if (localStreamRef.current && !muted) {
+                  try { for (const track of localStreamRef.current.getTracks()) pc.addTrack(track, localStreamRef.current); } catch(e){}
+                }
               }
             });
-          }, 0);
+          } catch (e) {
+            console.error('Error creating initial peers:', e);
+          }
         });
 
         socketInstance.on("userJoined", (data) => {
           console.log("👤 User joined:", data.user);
+          // Update users list
           setUsers(data.participants);
           setMessages(prev => [...prev, {
             type: "system",
             message: `${data.user.name} joined the room`,
             timestamp: new Date().toISOString()
           }]);
+
+          // Existing clients should create a peer and be the offerer towards the new user
+          try {
+            const newUser = data.user;
+            const newParticipant = data.participants.find(p => p.id === newUser.id);
+            if (newParticipant && newParticipant.socketId && socketInstance && socketInstance.id !== newParticipant.socketId) {
+              // if we don't already have a pc for them, create one as offerer
+              if (!pcsRef.current.has(newParticipant.socketId)) {
+                console.log('Creating offerer peer for new user', newParticipant.socketId);
+                const pc = createPeer(newParticipant.socketId, socketInstance, true);
+                // if we have a local stream and not muted, add tracks so offer contains our audio
+                if (localStreamRef.current && !muted) {
+                  try {
+                    for (const track of localStreamRef.current.getTracks()) pc.addTrack(track, localStreamRef.current);
+                  } catch (e) { console.error('Error adding local tracks to new offerer pc', e); }
+                }
+              }
+            }
+          } catch (e) {
+            console.error('Error handling userJoined offer creation:', e);
+          }
         });
 
         // WebRTC signaling handlers
