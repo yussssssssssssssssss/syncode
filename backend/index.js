@@ -52,6 +52,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
+app.get("/healthz", (_req, res) => res.status(200).send("ok"));
 app.use('/api/auth', authRoutes);
 app.use('/api/room', protect, roomRoutes);
 
