@@ -59,204 +59,73 @@ A real-time collaborative coding platform built with React, Node.js, Express, Po
 ### Database
 - PostgreSQL with Prisma migrations
 
-## Installation & Setup
+# Syncode
 
-### Prerequisites
-- Node.js (v18 or higher)
-- PostgreSQL database
-- npm or yarn package manager
-- RapidAPI account (for external compilation)
+Lightweight README for running Syncode locally (frontend + backend).
 
-### Backend Setup
+This repository contains:
+
+- `backend/` — Express + Socket.IO server (Prisma + PostgreSQL)
+- `frontend/` — React + Vite frontend
+
+## Quick start (development)
+
+Prerequisites:
+- Node.js 18+ and npm
+
+1) Install dependencies
+
 ```bash
+# backend
 cd backend
 npm install
-```
 
-Create a `.env` file in the backend directory:
-```env
-DATABASE_URL="postgresql://username:password@localhost:5432/syncode"
-JWT_SECRET="your-jwt-secret-key"
-SESSION_SECRET="your-session-secret-key"
-```
-
-Set up the database:
-```bash
-npx prisma generate
-npx prisma db push
-```
-
-Start the backend server:
-```bash
-npm start
-```
-
-### Frontend Setup
-```bash
+# frontend (in a separate terminal)
 cd frontend
 npm install
 ```
 
-#### External Compilation Setup (Optional)
-To enable code execution for languages other than JavaScript:
+2) Configure environment
 
-1. Sign up for a free account at [RapidAPI](https://rapidapi.com/)
-2. Subscribe to the [Judge0 CE API](https://rapidapi.com/judge0-official/api/judge0-ce)
-3. Copy your API key from the RapidAPI dashboard
-4. Update `frontend/src/config.js`:
-```javascript
-export const JUDGE0_CONFIG = {
-  API_URL: 'https://judge0-ce.p.rapidapi.com',
-  API_KEY: 'your-actual-api-key-here',
-  HOST: 'judge0-ce.p.rapidapi.com'
-};
-```
+- Copy `backend/env.example` -> `backend/.env` and set `DATABASE_URL`, `JWT_SECRET`, etc.
+- Ensure `frontend/src/config.js` (or `src/config.js`) points `BASE_URL` to your backend (e.g. `http://localhost:4000`).
 
-Start the development server:
+3) (Optional) Prisma: generate client / run migrations
+
 ```bash
-npm run dev
+cd backend
+npx prisma generate
+# if you need to apply migrations locally
+npx prisma migrate dev --name init
 ```
 
-## WebSocket Events
+4) Run services
 
-### Client to Server
-- `joinRoom(roomCode)` - Join a specific room
-- `chatMessage(message)` - Send a chat message to room participants
-- `codeChange(data)` - Send code changes to other participants
-- `languageChange(data)` - Change programming language
-- `themeChange(data)` - Change editor theme
-- `cursorChange(data)` - Send cursor position updates
+```bash
+# start backend (dev)
+cd backend && npm run dev
 
-### Server to Client
-- `roomJoined(data)` - Confirmation of successful room join with room data
-- `userJoined(data)` - Notification when a new user joins the room
-- `userLeft(data)` - Notification when a user leaves the room
-- `chatMessage(data)` - Receive chat messages from other participants
-- `codeChange(data)` - Receive code changes from other participants
-- `languageChange(data)` - Receive language change notifications
-- `themeChange(data)` - Receive theme change notifications
-- `cursorChange(data)` - Receive cursor position updates
-- `codeSync(data)` - Initial code synchronization for new users
-- `error(data)` - Error notifications
-
-## API Endpoints
-
-### Authentication
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/login` - User login
-- `POST /api/auth/logout` - User logout
-- `GET /api/auth/me` - Get current user (protected)
-
-### Rooms
-- `POST /api/room/create` - Create a new room (protected)
-- `POST /api/room/join` - Join an existing room (protected)
-- `GET /api/room/:roomId/users` - Get room participants (protected)
-- `GET /api/room/:code` - Get room by code (protected)
-
-## Usage
-
-### Creating a Room
-1. Log in to your account
-2. Click "Create Room" on the dashboard
-3. You'll be automatically redirected to the room with a unique code
-4. Share the room code with others to invite them
-
-### Joining a Room
-1. Log in to your account
-2. Click "Join Room" on the dashboard
-3. Enter the 6-digit room code
-4. You'll be redirected to the room if the code is valid
-
-### Collaborative Coding
-1. **Real-time Editing**: Start typing code and see changes sync instantly
-2. **Language Selection**: Choose from 14+ programming languages
-3. **Theme Customization**: Switch between Dark, Light, and High Contrast themes
-4. **Code Execution**: 
-   - JavaScript: Run directly in browser
-   - HTML: Preview in new tab
-   - CSS: Apply temporarily to page
-   - Other languages: Use external compilation (requires API key)
-5. **File Management**: Download your code as files
-6. **Chat Integration**: Discuss code changes in real-time chat
-
-### Real-time Features
-- **Live Participants**: See all connected users in real-time
-- **Chat**: Send and receive messages with all room participants (including your own)
-- **Code Sync**: Real-time code synchronization across all participants
-- **Connection Status**: Monitor your WebSocket connection status
-- **User Notifications**: Get notified when users join or leave
-
-## Security Features
-
-- **Authentication Required**: All WebSocket connections require valid session
-- **Room Access Control**: Users can only join rooms they're participants in
-- **JWT Token Validation**: Secure token-based authentication
-- **Session Management**: Proper session handling for WebSocket connections
-- **CORS Configuration**: Secure cross-origin resource sharing
-- **Code Execution Sandbox**: Safe JavaScript execution environment
-
-## Development
-
-### Project Structure
-```
-syncode/
-├── backend/
-│   ├── controllers/     # API route handlers
-│   ├── middleware/      # Authentication middleware
-│   ├── routes/          # API routes
-│   ├── prisma/          # Database schema and migrations
-│   └── index.js         # Main server file with Socket.IO
-├── frontend/
-│   ├── src/
-│   │   ├── components/  # React components
-│   │   │   └── CollaborativeEditor.jsx  # Monaco Editor integration
-│   │   ├── pages/       # Page components
-│   │   └── config.js    # Configuration
-│   └── package.json
-└── README.md
+# start frontend (dev)
+cd frontend && npm run dev
 ```
 
-### Key Implementation Details
+Open the URL printed by Vite (commonly `http://localhost:5173`).
 
-#### WebSocket Authentication
-The application uses JWT tokens for Socket.IO authentication. When users log in, both httpOnly and non-httpOnly cookies are set for secure HTTP requests and Socket.IO access respectively.
+## Scripts (summary)
 
-#### Collaborative Editor
-- **Monaco Editor**: Professional-grade code editor with syntax highlighting
-- **Real-time Sync**: Debounced code change synchronization (500ms)
-- **Multi-language**: Support for 14+ programming languages
-- **Theme Support**: Multiple editor themes
-- **External Compilation**: Integration with Judge0 CE API for non-JavaScript languages
+- backend/package.json
+  - `start` — node index.js
+  - `dev` — nodemon index.js
 
-#### Chat System
-- **Instant Visibility**: User's own messages appear immediately in local state
-- **Real-time Sync**: Messages broadcast to all room participants
-- **System Messages**: Automatic notifications for user join/leave events
+- frontend/package.json
+  - `dev` — vite
+  - `build` — vite build
+  - `preview` — vite preview
 
-#### Code Execution
-- **JavaScript**: Sandboxed execution in browser
-- **HTML/CSS**: Live preview capabilities
-- **External Languages**: Compilation and execution via Judge0 CE API
-- **Error Handling**: Comprehensive error reporting and status updates
+## Notes & tips
 
-## Troubleshooting
+- If pages render with stale styles after edits, clear browser cache and hard-reload.
+- If WebSocket connections fail, confirm backend is running and CORS/socket options allow the frontend origin.
+- For production, build the frontend (`npm run build`) and host the `dist` output behind a static server or CDN.
 
-### Chat Messages Not Visible
-- Ensure you're connected to the WebSocket server (green "Connected" status)
-- Check browser console for any error messages
-- Verify that the backend server is running
-
-### Code Sync Issues
-- Check WebSocket connection status
-- Ensure all users are in the same room
-- Verify that the backend is properly storing room states
-
-### External Compilation Not Working
-- Verify your RapidAPI key is correctly set in `frontend/src/config.js`
-- Check that you're subscribed to the Judge0 CE API
-- Ensure your API key has sufficient quota for the current month
-
-### CORS Errors
-- Verify that your frontend port is included in the backend CORS configuration
-- Check that both frontend and backend are running on the expected ports
-- Restart the backend server after making CORS changes 
+If you want, I can add a root convenience script (e.g. `dev` that runs both frontend and backend with one command) or a Docker Compose file for local development.
