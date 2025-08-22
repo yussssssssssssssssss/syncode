@@ -8,46 +8,50 @@ const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('./generated/prisma');
 require('dotenv').config();
 
-const protect = require('./middleware/auth.middleware.js')
+const protect = require('./middleware/auth.middleware.js');
 const authRoutes = require('./routes/auth.routes.js');
 const roomRoutes = require('./routes/room.routes.js');
 
 const app = express();
 const server = createServer(app);
+
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+const PORT = process.env.PORT || 3000;
+const prisma = new PrismaClient();
+
+// In-memory per-room state
+const roomStates = new Map();
+
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: FRONTEND_URL,
     credentials: true
   }
 });
 
-const PORT = 3000;
-const prisma = new PrismaClient();
-// In-memory per-room state for code editor
-// Stores last known { code, language, theme }
-const roomStates = new Map();
-
-// Session middleware for HTTP requests
+// Session middleware
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-secret-key',
+  secret: process.env.SESSION_SECRET || 'fallback-secret',
   resave: true,
   saveUninitialized: true,
   cookie: {
-    secure: false, // Set to true in production with HTTPS
-    httpOnly: false, // Allow JavaScript access for Socket.IO
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    secure: process.env.NODE_ENV === "production", // HTTPS only in prod
+    httpOnly: true,
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    maxAge: 24 * 60 * 60 * 1000
   }
 }));
 
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: FRONTEND_URL,
   credentials: true,
 }));
 
-app.use(cookieParser())
+app.use(cookieParser());
 app.use(express.json());
-app.use(express.urlencoded({extended:true}));
+app.use(express.urlencoded({ extended: true }));
 
+// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/room', protect, roomRoutes);
 
@@ -55,26 +59,19 @@ app.use('/api/room', protect, roomRoutes);
 io.use(async (socket, next) => {
   try {
     const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.replace('Bearer ', '');
-    
-    if (!token) {
-      console.log('Socket.IO authentication failed - no token provided');
-      return next(new Error('Authentication required'));
-    }
+    if (!token) return next(new Error('Authentication required'));
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
 
-    if (!user) {
-      console.log('Socket.IO authentication failed - invalid user');
-      return next(new Error('Invalid user'));
-    }
+    if (!user) return next(new Error('Invalid user'));
 
     socket.userId = user.id;
     socket.userName = user.name || user.email;
-    console.log(`Socket.IO authentication successful for user: ${socket.userName}`);
+    console.log(`Socket.IO authenticated: ${socket.userName}`);
     next();
-  } catch (error) {
-    console.log('Socket.IO authentication failed:', error.message);
+  } catch (err) {
+    console.error('Socket.IO auth failed:', err.message);
     next(new Error('Authentication failed'));
   }
 });
@@ -278,7 +275,7 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(PORT, ()=> {
-    console.log(`Server running on http://localhost:${PORT}`);
-    console.log(`WebSocket server ready`);
-})
+server.listen(PORT, () => {
+  console.log(`✅ Server running on http://localhost:${PORT}`);
+  console.log(`✅ WebSocket ready (CORS → ${FRONTEND_URL})`);
+});
