@@ -14,6 +14,10 @@ export default function Dashboard() {
     const storedUser = JSON.parse(localStorage.getItem("user"));
     if (!storedUser) return navigate("/login");
     setUser(storedUser);
+    
+    // Debug: Check if we have cookies
+    console.log('Document cookies:', document.cookie);
+    console.log('Stored user:', storedUser);
   }, [navigate]);
 
   const handleLogout = async () => {
@@ -36,22 +40,30 @@ export default function Dashboard() {
     if (loading) return;
     
     setLoading(true);
+    console.log('Creating room...');
+    console.log('Document cookies before request:', document.cookie);
+    
     try {
       const res = await fetch(`${BASE_URL}/api/room/create`, {
         method: "POST",
-        credentials: "include",
+        credentials: "include", // This is crucial for sending cookies
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ username: user.name }),
       });
       
+      console.log('Response status:', res.status);
+      console.log('Response headers:', [...res.headers.entries()]);
+      
       const data = await res.json();
+      console.log('Response data:', data);
       
       if (res.ok && data.roomId) {
         navigate(`/room/${data.roomId}`);
       } else {
-        alert(data.message || "Failed to create room");
+        // Show more detailed error information
+        alert(`Failed to create room: ${data.message}\n\nDebug info: ${JSON.stringify(data.debug || {}, null, 2)}`);
       }
     } catch (err) {
       console.error("Create room error:", err);
@@ -68,22 +80,27 @@ export default function Dashboard() {
     if (loading) return;
     
     setLoading(true);
+    console.log('Joining room:', roomCode);
+    console.log('Document cookies before request:', document.cookie);
+    
     try {
       const res = await fetch(`${BASE_URL}/api/room/join`, {
         method: "POST",
-        credentials: "include",
+        credentials: "include", // This is crucial for sending cookies
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ code: roomCode }),
       });
       
+      console.log('Join room response status:', res.status);
       const data = await res.json();
+      console.log('Join room response data:', data);
       
       if (res.ok) {
         navigate(`/room/${data.room.code}`);
       } else {
-        alert(data.message || "Failed to join room");
+        alert(`Failed to join room: ${data.message}\n\nDebug info: ${JSON.stringify(data.debug || {}, null, 2)}`);
       }
     } catch (err) {
       console.error("Join room error:", err);
@@ -112,6 +129,15 @@ export default function Dashboard() {
               <PopupMenu email={user.email} onLogout={handleLogout} />
             </div>
           )}
+        </div>
+
+        {/* Debug Info */}
+        <div className="mb-4 p-4 bg-slate-800 rounded-lg text-left text-sm text-slate-300 max-w-2xl">
+          <div><strong>Debug Info:</strong></div>
+          <div>User ID: {user.id}</div>
+          <div>User Email: {user.email}</div>
+          <div>Cookies: {document.cookie || 'No cookies found'}</div>
+          <div>Base URL: {BASE_URL}</div>
         </div>
 
         {/* Welcome & Animation */}

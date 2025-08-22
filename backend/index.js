@@ -17,39 +17,57 @@ const server = createServer(app);
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 const PORT = process.env.PORT || 3000;
+
 const prisma = new PrismaClient();
 
 // In-memory per-room state
 const roomStates = new Map();
 
+// CORS configuration - MUST be before other middleware
+app.use(cors({
+  origin: FRONTEND_URL,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['set-cookie']
+}));
+
+// Cookie parser MUST be before other middleware that uses cookies
+app.use(cookieParser());
+
+// Body parsing middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Session middleware (after cookie parser)
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'fallback-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: true, // Always true for Vercel + Render (both use HTTPS)
+    httpOnly: true,
+    sameSite: "none", // Required for cross-origin cookies
+    maxAge: 24 * 60 * 60 * 1000,
+    domain: undefined // Don't set domain for cross-origin cookies
+  }
+}));
+
+// Debug middleware to log requests
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`);
+  console.log('Cookies:', req.cookies);
+  console.log('Authorization header:', req.headers.authorization);
+  next();
+});
+
+// Socket.IO setup
 const io = new Server(server, {
   cors: {
     origin: FRONTEND_URL,
     credentials: true
   }
 });
-
-// Session middleware
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'fallback-secret',
-  resave: true,
-  saveUninitialized: true,
-  cookie: {
-    secure: process.env.NODE_ENV === "production", // HTTPS only in prod
-    httpOnly: true,
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-    maxAge: 24 * 60 * 60 * 1000
-  }
-}));
-
-app.use(cors({
-  origin: FRONTEND_URL,
-  credentials: true,
-}));
-
-app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.get("/healthz", (_req, res) => res.status(200).send("ok"));
@@ -59,13 +77,43 @@ app.use('/api/room', protect, roomRoutes);
 // Socket.IO middleware for authentication using JWT
 io.use(async (socket, next) => {
   try {
-    const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.replace('Bearer ', '');
-    if (!token) return next(new Error('Authentication required'));
+    let token;
+
+    // Try multiple ways to get the token for cross-origin setup
+    // 1. From auth object (when explicitly passed)
+    if (socket.handshake.auth.token) {
+      token = socket.handshake.auth.token;
+    }
+    // 2. From Authorization header
+    else if (socket.handshake.headers.authorization?.startsWith('Bearer ')) {
+      token = socket.handshake.headers.authorization.split(' ')[1];
+    }
+    // 3. From cookies (parse manually for cross-origin)
+    else if (socket.handshake.headers.cookie) {
+      const cookies = socket.handshake.headers.cookie.split(';');
+      for (let cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'socketToken' || name === 'token') {
+          token = value;
+          break;
+        }
+      }
+    }
+    
+    if (!token) {
+      console.log('Socket.IO: No token provided');
+      console.log('Available cookies:', socket.handshake.headers.cookie);
+      console.log('Auth object:', socket.handshake.auth);
+      return next(new Error('Authentication required'));
+    }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
-
-    if (!user) return next(new Error('Invalid user'));
+    
+    if (!user) {
+      console.log('Socket.IO: User not found for token');
+      return next(new Error('Invalid user'));
+    }
 
     socket.userId = user.id;
     socket.userName = user.name || user.email;
@@ -180,8 +228,16 @@ io.on('connection', (socket) => {
   socket.on('codeChange', (data) => {
     if (socket.roomCode && data.roomCode === socket.roomCode) {
       // Persist last known code state for this room
-      const currentState = roomStates.get(socket.roomCode) || { code: '', language: 'javascript', theme: 'vs-dark' };
-      roomStates.set(socket.roomCode, { ...currentState, code: data.code });
+      const currentState = roomStates.get(socket.roomCode) || {
+        code: '',
+        language: 'javascript',
+        theme: 'vs-dark'
+      };
+      roomStates.set(socket.roomCode, {
+        ...currentState,
+        code: data.code
+      });
+
       socket.to(socket.roomCode).emit('codeChange', {
         userId: socket.userId,
         userName: socket.userName,
@@ -196,8 +252,16 @@ io.on('connection', (socket) => {
   socket.on('languageChange', (data) => {
     if (socket.roomCode && data.roomCode === socket.roomCode) {
       // Persist language in room state
-      const currentState = roomStates.get(socket.roomCode) || { code: '', language: 'javascript', theme: 'vs-dark' };
-      roomStates.set(socket.roomCode, { ...currentState, language: data.language });
+      const currentState = roomStates.get(socket.roomCode) || {
+        code: '',
+        language: 'javascript',
+        theme: 'vs-dark'
+      };
+      roomStates.set(socket.roomCode, {
+        ...currentState,
+        language: data.language
+      });
+
       socket.to(socket.roomCode).emit('languageChange', {
         userId: socket.userId,
         userName: socket.userName,
@@ -211,8 +275,16 @@ io.on('connection', (socket) => {
   socket.on('themeChange', (data) => {
     if (socket.roomCode && data.roomCode === socket.roomCode) {
       // Persist theme in room state
-      const currentState = roomStates.get(socket.roomCode) || { code: '', language: 'javascript', theme: 'vs-dark' };
-      roomStates.set(socket.roomCode, { ...currentState, theme: data.theme });
+      const currentState = roomStates.get(socket.roomCode) || {
+        code: '',
+        language: 'javascript',
+        theme: 'vs-dark'
+      };
+      roomStates.set(socket.roomCode, {
+        ...currentState,
+        theme: data.theme
+      });
+
       socket.to(socket.roomCode).emit('themeChange', {
         userId: socket.userId,
         userName: socket.userName,
@@ -222,7 +294,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle cursor position changes (for future cursor tracking)
+  // Handle cursor position changes
   socket.on('cursorChange', (data) => {
     if (socket.roomCode && data.roomCode === socket.roomCode) {
       socket.to(socket.roomCode).emit('cursorChange', {
@@ -272,6 +344,7 @@ io.on('connection', (socket) => {
         console.error('Error handling disconnect:', error);
       }
     }
+
     console.log(`User ${socket.userName} (${socket.userId}) disconnected`);
   });
 });
