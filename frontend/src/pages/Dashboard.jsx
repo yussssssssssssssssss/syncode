@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PopupMenu from "../components/PopupMenu";
-import ThemeToggle from "../components/ThemeToggle";
 import { BASE_URL } from "../config";
 import { FaPlus, FaUsers } from "react-icons/fa";
 
@@ -39,8 +38,13 @@ export default function Dashboard() {
         body: JSON.stringify({ username: user.name }),
       });
       const data = await res.json();
-      if (res.ok && data.roomId) navigate(`/room/${data.roomId}`);
-      else alert(data.message || "Failed to create room");
+      if (res.ok) {
+        const roomPath = data.roomId || data.room?.id || data.room?.code;
+        if (roomPath) navigate(`/room/${roomPath}`);
+        else alert(data.message || "Room created but no room id returned");
+      } else {
+        alert(data.message || "Failed to create room");
+      }
     } catch (err) {
       console.error("Create room error:", err);
       alert("Failed to create room. Please try again.");
@@ -79,9 +83,8 @@ export default function Dashboard() {
             <div className="text-white font-semibold">Syncode</div>
           </div>
           <div className="flex items-center gap-4">
-            <ThemeToggle />
             <div className="relative">
-              <button onClick={() => setMenuOpen(p => !p)} className="w-11 h-11 rounded-full bg-white/6 flex items-center justify-center text-white font-semibold">{user.name?.[0]?.toUpperCase()}</button>
+              <button onClick={() => setMenuOpen(p => !p)} className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-emerald-400 text-white font-semibold flex items-center justify-center shadow-sm">{user.name?.[0]?.toUpperCase()}</button>
               {menuOpen && (
                 <div className="absolute right-0 mt-3 bg-slate-800 rounded-lg shadow-lg p-3 w-48">
                   <div className="text-sm text-slate-200 mb-2">{user.email}</div>
@@ -114,14 +117,7 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <aside className="p-6 rounded-2xl bg-white/4 backdrop-blur-md border border-white/6 shadow-lg">
-            <div className="text-sm text-emerald-300 uppercase">Usage</div>
-            <div className="mt-4 text-white font-medium">Active Rooms</div>
-            <div className="mt-6 text-slate-300 text-sm">You currently have no active rooms. Create one to get started.</div>
-            <div className="mt-6">
-              <button onClick={handleCreateRoom} className="w-full px-4 py-2 rounded-lg bg-emerald-400 text-slate-900 font-semibold">Create Room</button>
-            </div>
-          </aside>
+          {/* Right column was removed to simplify layout and avoid duplicate usage panel */}
         </main>
 
         <section className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">

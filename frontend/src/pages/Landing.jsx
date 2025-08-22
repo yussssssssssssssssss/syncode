@@ -1,6 +1,5 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import ThemeToggle from "../components/ThemeToggle";
 import { FaUsers, FaBolt, FaLock, FaPalette, FaRocket } from "./LandingIcons";
 
 export default function Landing() {
@@ -34,20 +33,15 @@ export default function Landing() {
       </div>
 
       {/* Header */}
-      <header className="sticky top-0 z-40 w-full backdrop-blur-md bg-slate-900/50 border-b border-white/5">
+      <header className="sticky top-0 z-40 w-full bg-transparent border-b border-transparent">
         <div className="max-w-7xl mx-auto flex items-center justify-between py-4 px-6">
           <div className="flex items-center gap-3">
-            <div className="relative w-12 h-12">
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-400 to-blue-400 rounded-xl blur opacity-50"></div>
-              <div className="relative w-full h-full rounded-xl bg-gradient-to-br from-emerald-400 to-blue-400 flex items-center justify-center text-white font-bold text-xl shadow-lg">
-                SC
-              </div>
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-400 to-blue-400 flex items-center justify-center text-white font-semibold text-lg shadow-sm">
+              SC
             </div>
-            <div className="text-white font-bold text-xl">Syncode</div>
+            <div className="text-white font-semibold text-lg">Syncode</div>
           </div>
-          <div className="flex items-center gap-6">
-            <ThemeToggle />
-          </div>
+          <div />
         </div>
       </header>
 
@@ -55,9 +49,8 @@ export default function Landing() {
         {/* Hero Section */}
         <div className="text-center mb-20">
           <div className="inline-block">
-            <div className="relative inline-flex items-center px-6 py-2 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 text-blue-300 text-sm font-medium mb-6 animate-fadeIn">
+            <div className="relative inline-flex items-center px-6 py-2 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 text-blue-300 text-sm font-medium mb-6">
               <span className="flex w-2 h-2 mx-2">
-                <span className="absolute inline-flex w-full h-full rounded-full bg-emerald-400 opacity-75 animate-ping"></span>
                 <span className="relative inline-flex w-2 h-2 rounded-full bg-emerald-400"></span>
               </span>
               Next Generation Collaborative IDE
