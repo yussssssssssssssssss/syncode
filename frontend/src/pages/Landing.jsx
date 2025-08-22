@@ -1,187 +1,81 @@
+
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { FaUsers, FaBolt, FaLock, FaPalette, FaRocket } from "./LandingIcons";
 
 export default function Landing() {
   const navigate = useNavigate();
-
-  // ripple CTA helper
-  const handleRipple = (e, to) => {
-    const btn = e.currentTarget;
-    const circle = document.createElement("span");
-    const diameter = Math.max(btn.clientWidth, btn.clientHeight);
-    const radius = diameter / 2;
-    circle.style.width = circle.style.height = `${diameter}px`;
-    circle.style.left = `${e.clientX - (btn.getBoundingClientRect().left + radius)}px`;
-    circle.style.top = `${e.clientY - (btn.getBoundingClientRect().top + radius)}px`;
-    circle.className = "ripple";
-    const ripple = btn.getElementsByClassName("ripple")[0];
-    if (ripple) ripple.remove();
-    btn.appendChild(circle);
-    setTimeout(() => {
-      if (to) navigate(to);
-    }, 220);
-  };
-
   return (
-    <div className="min-h-screen w-full bg-landing-dark dark:bg-gradient-to-br dark:from-[#001429] dark:via-[#022631] dark:to-[#01203b] flex flex-col items-center justify-start relative overflow-x-hidden">
-      {/* Animated Gradient Orbs */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-blue-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] bg-emerald-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-pulse" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute top-1/3 right-1/4 w-[400px] h-[400px] bg-purple-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-10 animate-pulse" style={{ animationDelay: '2s' }}></div>
-      </div>
-
-      {/* Header */}
-      <header className="sticky top-0 z-40 w-full bg-transparent border-b border-transparent">
-        <div className="max-w-7xl mx-auto flex items-center justify-between py-4 px-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-400 to-blue-400 flex items-center justify-center text-white font-semibold text-lg shadow-sm">
-              SC
+    <div className="min-h-screen w-full bg-gradient-to-br from-slate-950 via-blue-950 to-emerald-950 flex flex-col items-center justify-center px-4 animate-fadeIn relative overflow-x-hidden">
+      {/* Glassmorphism Glow */}
+      <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-br from-blue-700/30 via-emerald-500/10 to-transparent blur-3xl z-0" />
+      <header className="mb-10 z-10 flex flex-col items-center w-full">
+        <div className="flex flex-col items-center w-full">
+          <h1 className="relative text-center select-none">
+            <span className="block text-3xl md:text-4xl font-bold text-blue-400/90 animate-fadeIn tracking-wide" style={{animationDelay:'0.1s'}}>Welcome to</span>
+            <div className="relative mt-4">
+              <span className="absolute -inset-x-20 -inset-y-8 bg-gradient-to-r from-blue-600/20 via-emerald-600/20 to-blue-600/20 blur-xl animate-pulse"></span>
+              <span className="relative block text-[3em] md:text-[4em] leading-none font-black bg-gradient-to-r from-blue-400 via-emerald-400 to-blue-500 bg-clip-text text-transparent drop-shadow-[0_10px_40px_rgba(16,185,129,0.35)] animate-gradientMove" style={{letterSpacing:'-0.02em'}}>
+                SyncCode
+              </span>
             </div>
-            <div className="text-white font-semibold text-lg">Syncode</div>
-          </div>
-          <div />
+            <div className="flex items-center justify-center gap-3 mt-6 animate-fadeIn" style={{animationDelay:'0.8s'}}>
+              <span className="w-12 h-1 bg-gradient-to-r from-blue-400 to-emerald-400 rounded-full"></span>
+              <span className="text-slate-400 text-lg font-medium">Collaborate in Real-time</span>
+              <span className="w-12 h-1 bg-gradient-to-r from-emerald-400 to-blue-400 rounded-full"></span>
+            </div>
+          </h1>
+          <p className="text-2xl md:text-3xl text-slate-200 max-w-2xl mx-auto animate-fadeIn delay-300 font-medium text-center mt-6">
+            Real-time collaborative coding.<br />
+            <span className="text-emerald-400">Seamless teamwork.</span> <span className="text-blue-400">Effortless creation.</span>
+          </p>
         </div>
       </header>
-
-      <main className="relative z-10 w-full max-w-7xl mx-auto px-6 py-20">
-        {/* Hero Section */}
-        <div className="text-center mb-20">
-          <div className="inline-block">
-            <div className="relative inline-flex items-center px-6 py-2 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 text-blue-300 text-sm font-medium mb-6">
-              <span className="flex w-2 h-2 mx-2">
-                <span className="relative inline-flex w-2 h-2 rounded-full bg-emerald-400"></span>
-              </span>
-              Next Generation Collaborative IDE
-            </div>
-          </div>
-          
-          <h1 className="relative">
-            <span className="block text-4xl md:text-6xl font-bold text-white mb-6 animate-fadeIn" style={{ animationDelay: '0.2s' }}>
-              Code Together,{' '}
-              <span className="relative">
-                <span className="absolute -inset-1 bg-emerald-400/20 blur"></span>
-                <span className="relative">Seamlessly</span>
-              </span>
-            </span>
-            <span className="block text-2xl md:text-3xl bg-gradient-to-r from-blue-400 via-emerald-400 to-blue-500 bg-clip-text text-transparent font-medium animate-fadeIn" style={{ animationDelay: '0.4s' }}>
-              Real-time collaboration meets AI assistance
-            </span>
-          </h1>
-
-          <p className="mt-6 text-lg md:text-xl text-slate-300 max-w-2xl mx-auto animate-fadeIn" style={{ animationDelay: '0.6s' }}>
-            Experience the future of pair programming with low-latency editing, voice chat, and AI-powered code suggestions — all in a beautiful dark interface.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-10 animate-fadeIn" style={{ animationDelay: '0.8s' }}>
-            <button
-              onClick={(e) => handleRipple(e, "/register")}
-              className="cta-btn group relative w-full sm:w-auto overflow-hidden px-8 py-4 rounded-xl text-lg font-semibold bg-gradient-to-r from-emerald-400 to-blue-400 text-white shadow-xl hover:scale-[1.02] transition-all duration-300 focus:outline-none"
-            >
-              <span className="relative z-10 flex items-center justify-center gap-2">
-                Get Started
-                <svg className="w-5 h-5 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </span>
-            </button>
-
-            <button
-              onClick={(e) => handleRipple(e, "/login")}
-              className="cta-secondary relative w-full sm:w-auto overflow-hidden px-8 py-4 rounded-xl text-lg font-semibold border border-white/10 text-white hover:bg-white/5 transition-all duration-300 focus:outline-none"
-            >
-              Sign In
-            </button>
-          </div>
+      <div className="flex gap-8 mb-16 animate-fadeIn delay-400 z-10">
+        <button
+          onClick={() => navigate("/register")}
+          className="px-10 py-4 rounded-2xl text-2xl font-bold bg-emerald-600 hover:bg-emerald-700 transition-all duration-300 shadow-xl text-white hover:scale-105 focus:outline-none focus:ring-4 focus:ring-emerald-400 backdrop-blur-lg"
+        >
+          Get Started
+        </button>
+        <button
+          onClick={() => navigate("/login")}
+          className="px-10 py-4 rounded-2xl text-2xl font-bold bg-blue-600 hover:bg-blue-700 transition-all duration-300 shadow-xl text-white hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-400 backdrop-blur-lg"
+        >
+          Login
+        </button>
+      </div>
+      {/* Features Section */}
+      <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-8 mb-20 z-10">
+        <div className="rounded-3xl bg-slate-800/70 p-8 shadow-2xl flex flex-col items-center text-center backdrop-blur-lg animate-fadeIn delay-600">
+          <FaBolt className="text-4xl text-emerald-400 mb-3 animate-pulse" />
+          <h2 className="text-xl font-bold text-slate-100 mb-2">Lightning-fast Collaboration</h2>
+          <p className="text-lg text-slate-300">Work together in real-time with zero lag and instant updates.</p>
         </div>
-
-        {/* Features Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mt-20">
-          <div className="group p-8 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-emerald-500/20 transition-all duration-300">
-            <div className="flex items-start gap-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-400/10 to-blue-400/10 text-emerald-400">
-                <FaBolt className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-emerald-400 transition-colors">Lightning Fast</h3>
-                <p className="text-slate-300">Experience real-time collaboration with zero latency. Your changes appear instantly across all connected sessions.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="group p-8 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-blue-500/20 transition-all duration-300">
-            <div className="flex items-start gap-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-blue-400/10 to-emerald-400/10 text-blue-400">
-                <FaLock className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors">Secure & Private</h3>
-                <p className="text-slate-300">End-to-end encryption keeps your code safe. Private rooms with secure tokens ensure complete privacy.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="group p-8 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-emerald-500/20 transition-all duration-300">
-            <div className="flex items-start gap-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-400/10 to-blue-400/10 text-emerald-400">
-                <FaPalette className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-emerald-400 transition-colors">Modern Interface</h3>
-                <p className="text-slate-300">A thoughtfully designed dark interface with smooth transitions and delightful micro-interactions.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="group p-8 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-blue-500/20 transition-all duration-300">
-            <div className="flex items-start gap-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-blue-400/10 to-emerald-400/10 text-blue-400">
-                <FaUsers className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors">Team Friendly</h3>
-                <p className="text-slate-300">Create or join rooms instantly. Perfect for pair programming sessions and team collaborations.</p>
-              </div>
-            </div>
-          </div>
+        <div className="rounded-3xl bg-slate-800/70 p-8 shadow-2xl flex flex-col items-center text-center backdrop-blur-lg animate-fadeIn delay-700">
+          <FaLock className="text-4xl text-blue-400 mb-3 animate-fadeIn" />
+          <h2 className="text-xl font-bold text-slate-100 mb-2">Private & Secure Rooms</h2>
+          <p className="text-lg text-slate-300">Your code and sessions are always protected and private to your team.</p>
         </div>
-
-        {/* CTA Section */}
-        <div className="relative mt-32 text-center">
-          <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/20 via-blue-400/20 to-emerald-400/20 blur-3xl opacity-50"></div>
-          <div className="relative">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">Ready to Start Coding Together?</h2>
-            <p className="text-lg text-slate-300 mb-8 max-w-2xl mx-auto">Join thousands of developers who are already experiencing the future of collaborative coding.</p>
-            <button
-              onClick={(e) => handleRipple(e, "/register")}
-              className="cta-btn group relative inline-flex items-center overflow-hidden px-8 py-4 rounded-xl text-lg font-semibold bg-gradient-to-r from-emerald-400 to-blue-400 text-white shadow-xl hover:scale-[1.02] transition-all duration-300 focus:outline-none"
-            >
-              <span className="relative z-10 flex items-center justify-center gap-2">
-                Get Started Now
-                <FaRocket className="transition-transform group-hover:translate-x-1" />
-              </span>
-            </button>
-          </div>
+        <div className="rounded-3xl bg-slate-800/70 p-8 shadow-2xl flex flex-col items-center text-center backdrop-blur-lg animate-fadeIn delay-800">
+          <FaPalette className="text-4xl text-emerald-400 mb-3 animate-fadeIn" />
+          <h2 className="text-xl font-bold text-slate-100 mb-2">Modern, Beautiful UI</h2>
+          <p className="text-lg text-slate-300">Enjoy a stunning dark interface with smooth transitions and glassmorphism.</p>
         </div>
-        
-        <footer className="text-center py-8 mt-32 text-slate-400 border-t border-white/5">
-          <p>&copy; {new Date().getFullYear()} Syncode. All rights reserved.</p>
-        </footer>
-      </main>
-
-      {/* Ripple effect styles */}
-      <style>{`
-        .ripple {
-          position: absolute;
-          border-radius: 50%;
-          transform: scale(0);
-          animation: ripple 600ms linear;
-          background: rgba(255,255,255,0.15);
-          pointer-events: none;
-        }
-        @keyframes ripple { to { transform: scale(4); opacity: 0; } }
-      `}</style>
+        <div className="rounded-3xl bg-slate-800/70 p-8 shadow-2xl flex flex-col items-center text-center backdrop-blur-lg animate-fadeIn delay-900">
+          <FaUsers className="text-4xl text-blue-400 mb-3 animate-fadeIn" />
+          <h2 className="text-xl font-bold text-slate-100 mb-2">Effortless Team Onboarding</h2>
+          <p className="text-lg text-slate-300">Create or join a room in seconds. No setup, just code together.</p>
+        </div>
+      </div>
+      {/* Call to Action */}
+      <div className="flex flex-col items-center mt-8 z-10 animate-fadeIn delay-1000">
+        <FaRocket className="text-5xl text-emerald-400 mb-2 animate-bounce" />
+        <span className="text-xl text-slate-200 font-semibold">Ready to boost your productivity?</span>
+      </div>
+      <footer className="mt-20 text-slate-500 animate-fadeIn delay-1200 z-10">
+        &copy; {new Date().getFullYear()} Syncode. All rights reserved.
+      </footer>
     </div>
   );
 }

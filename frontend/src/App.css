@@ -16,36 +16,3 @@
 	0%, 100% { background-position: 0% 50%; }
 	50% { background-position: 100% 50%; }
 }
-
-/* Theme transition */
-:root {
-  --bg-transition: background-color 240ms ease, color 240ms ease;
-}
-html, body, #root {
-  transition: var(--bg-transition);
-}
-
-/* Button glow utility */
-.glow-btn {
-  box-shadow: 0 8px 30px rgba(16,185,129,0.12);
-}
-
-/* Ripple base */
-.cta-btn .ripple, .cta-secondary .ripple {
-  position: absolute;
-  border-radius: 50%;
-  transform: scale(0);
-  animation: ripple 420ms linear;
-  background: rgba(255,255,255,0.22);
-  pointer-events: none;
-}
-@keyframes ripple { to { transform: scale(4); opacity: 0; } }
-
-/* Ensure dropdowns and popovers float above editors */
-.z-top {
-  z-index: 60 !important;
-}
-
-/* Accessibility: focus ring improvements */
-:focus { outline: none; }
-.button-focus:focus { box-shadow: 0 0 0 4px rgba(34,197,94,0.12); }

@@ -504,10 +504,10 @@ export default function Room() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
       <Header />
-      <div className="p-4 md:p-6">
-  {/* hidden audio container for remote audio elements (visually-hidden to keep elements in DOM for autoplay) */}
-  <div id="audio-container" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', left: '-9999px', top: 'auto' }} aria-hidden="true" />
-  <div className="bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg shadow p-6 mb-6 border border-slate-200 dark:border-slate-700 transition-colors relative z-top">
+      <div className="p-6">
+  {/* hidden audio container for remote audio elements */}
+  <div id="audio-container" className="hidden" />
+        <div className="bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg shadow p-6 mb-6 border border-slate-200 dark:border-slate-700 transition-colors">
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center gap-2 group">
               <h1 className="text-2xl font-bold">Room: <span className="bg-gradient-to-r from-blue-500 to-emerald-500 bg-clip-text text-transparent">{room.code}</span></h1>
@@ -532,7 +532,7 @@ export default function Room() {
               <span className="text-sm text-gray-600 dark:text-gray-300">
                 {connected ? 'Connected' : 'Disconnected'}
               </span>
-              <button onClick={toggleMute} className="ml-4 px-3 py-1 rounded-md bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 transition button-focus">
+              <button onClick={toggleMute} className="ml-4 px-3 py-1 rounded-md bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 transition">
                 {muted ? <FaMicrophoneSlash className="inline-block mr-2" /> : <FaMicrophone className="inline-block mr-2" />} 
                 <span className="text-sm">{muted ? 'Muted' : 'Unmuted'}</span>
               </button>
@@ -543,7 +543,7 @@ export default function Room() {
               Connection Error: {connectionError}
             </div>
           )}
-          <div className="flex items-center gap-3 group flex-wrap">
+          <div className="flex items-center gap-3 group">
             <p className="text-gray-700 dark:text-slate-300">Room Code: 
               <span className="font-mono font-semibold ml-2">{room.code}</span>
             </p>
@@ -569,9 +569,9 @@ export default function Room() {
           )}
         </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+  <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Participants List */}
-          <div className="md:col-span-1 lg:col-span-1">
+          <div className="lg:col-span-1">
             <div className="bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg shadow p-6 mb-6 border border-slate-200 dark:border-slate-700 transition-colors">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold mb-4">Participants ({users.length})</h2>
@@ -582,7 +582,7 @@ export default function Room() {
               <div className="space-y-2">
                 {users.map((user) => (
                   <div key={user.id} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-slate-900/40 rounded">
-                    <span className="font-medium truncate max-w-[160px]">{user.name}</span>
+                    <span className="font-medium">{user.name}</span>
                     <span className={`px-2 py-1 rounded text-xs ${
                       user.role === 'organiser' 
                         ? 'bg-green-100 text-green-800' 
@@ -598,7 +598,7 @@ export default function Room() {
             {/* Chat Section */}
             <div className="bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg shadow p-6 border border-slate-200 dark:border-slate-700 transition-colors">
               <h2 className="text-lg font-semibold mb-4">Chat</h2>
-              <div className="h-56 md:h-64 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded p-3 mb-4 bg-gray-50 dark:bg-slate-900/40">
+              <div className="h-64 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded p-3 mb-4 bg-gray-50 dark:bg-slate-900/40">
                 {messages.length === 0 ? (
                   <p className="text-gray-500 dark:text-slate-400 text-center mt-8">No messages yet. Start the conversation!</p>
                 ) : (
@@ -649,8 +649,8 @@ export default function Room() {
           </div>
 
           {/* Collaborative Editor */}
-          <div className="md:col-span-2 lg:col-span-3 flex flex-col">
-            <div className="flex-1 min-h-[50vh] md:min-h-[70vh]">
+          <div className="lg:col-span-3">
+            <div className="min-h-[60vh]">
                 <CollaborativeEditor 
                   socket={socket} 
                   roomCode={roomCode} 

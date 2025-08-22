@@ -3,10 +3,6 @@ import { useEffect, useState } from 'react';
 export default function ThemeToggle() {
   const [theme, setTheme] = useState(() => {
     if (typeof window === 'undefined') return 'dark';
-    try {
-      const stored = localStorage.getItem('theme');
-      if (stored) return stored;
-    } catch {}
     return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
   });
 
@@ -27,26 +23,13 @@ export default function ThemeToggle() {
     window.dispatchEvent(new CustomEvent('themechange', { detail: { theme } }));
   }, [theme]);
 
-  // Keep internal state in sync if something else toggles the root class
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      const isDark = document.documentElement.classList.contains('dark');
-      setTheme(isDark ? 'dark' : 'light');
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-
   const toggle = () => setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
 
   return (
     <button
       onClick={toggle}
       aria-label="Toggle theme"
-      className="relative inline-flex h-9 w-16 items-center rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 p-1 transition-transform focus:outline-none button-focus"
-      role="switch"
-      aria-checked={theme === 'dark'}
-      style={{ cursor: 'pointer' }}
+      className="relative inline-flex h-9 w-16 items-center rounded-full bg-gradient-to-r from-blue-500 to-emerald-500 p-1 transition-transform focus:outline-none focus:ring-2 focus:ring-emerald-400"
     >
       <span
         className={`inline-flex h-7 w-7 transform items-center justify-center rounded-full bg-white text-slate-700 shadow transition-transform duration-300 ${
