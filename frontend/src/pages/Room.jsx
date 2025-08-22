@@ -293,10 +293,9 @@ export default function Room() {
               </div>
             </div>
 
-            {/* Voice Chat */}
-              <div className="bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg shadow p-6 mb-6 border border-slate-200 dark:border-slate-700 transition-colors">
-                <VoiceChat socket={socket} />
-              </div>
+            <div className="bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg shadow p-6 mb-6 border border-slate-200 dark:border-slate-700 transition-colors">
+              <VoiceChat socket={socket} roomCode={roomCode} />
+            </div>
 
             {/* Chat Section */}
             <div className="bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg shadow p-6 border border-slate-200 dark:border-slate-700 transition-colors">

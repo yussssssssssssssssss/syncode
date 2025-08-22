@@ -1,268 +1,259 @@
 import { useEffect, useRef, useState } from "react";
 import Peer from "simple-peer";
 
-export default function VoiceChat({ socket }) {
-    const [joined, setJoined] = useState(false);
-    const [muted, setMuted] = useState(false);
-    const [peers, setPeers] = useState({}); // socketId -> { peer, stream, muted }
-    const [error, setError] = useState(null);
+/**
+ * VoiceChat
+ * - Mesh P2P audio using simple-peer + your existing Socket.IO connection
+ * - Anyone can mute/unmute themselves
+ * - No roles/permissions involved
+ */
+export default function VoiceChat({ socket, roomCode }) {
+  const [joined, setJoined] = useState(false);
+  const [muted, setMuted] = useState(true); // start muted
+  const [connecting, setConnecting] = useState(false);
+  const [peers, setPeers] = useState({}); // socketId -> { peer, stream }
+  const [error, setError] = useState(null);
 
-    const localStreamRef = useRef(null);
-    const localAudioRef = useRef(null);
-    const peersRef = useRef(new Map()); // socketId -> Peer instance
+  const localStreamRef = useRef(null);
+  const localAudioRef = useRef(null);
+  const peersRef = useRef(new Map()); // socketId -> Peer
 
-    // Helpers
-    const addRemoteAudio = async (socketId, remoteStream) => {
-        let audio = document.getElementById(`audio-${socketId}`);
-        if (!audio) {
-            audio = document.createElement("audio");
-            audio.id = `audio-${socketId}`;
-            audio.autoplay = true;
-            audio.playsInline = true;
-            document.body.appendChild(audio);
+  // --- ICE servers: works for most dev cases. For prod/NAT edge cases, add a TURN (see notes).
+  const iceServers = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:global.stun.twilio.com:3478?transport=udp" },
+  ];
+
+  useEffect(() => {
+    if (!socket || !roomCode) return;
+
+    // Incoming WebRTC signaling
+    socket.on("voice:signal", handleSignal);
+    socket.on("voice:peer-left", handlePeerLeft);
+    socket.on("voice:participants", handleParticipants);
+    socket.on("voice:error", (e) => setError(e?.message || "Voice error"));
+
+    return () => {
+      socket.off("voice:signal", handleSignal);
+      socket.off("voice:peer-left", handlePeerLeft);
+      socket.off("voice:participants", handleParticipants);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket, roomCode]);
+
+  const handleParticipants = ({ participants }) => {
+    // UI-only: show who is in voice channel if you like.
+    // We don't need to do anything special here for the mesh itself.
+  };
+
+  const handlePeerLeft = ({ socketId }) => {
+    const entry = peersRef.current.get(socketId);
+    if (entry) {
+      try { entry.destroy(); } catch {}
+      peersRef.current.delete(socketId);
+      setPeers((prev) => {
+        const copy = { ...prev };
+        delete copy[socketId];
+        return copy;
+      });
+      // Remove remote audio element
+      const audio = document.getElementById(`voice-audio-${socketId}`);
+      if (audio) {
+        audio.srcObject = null;
+        audio.remove();
+      }
+    }
+  };
+
+  const handleSignal = async ({ from, signal }) => {
+    let p = peersRef.current.get(from);
+    if (!p) {
+      // Create non-initiator peer on receiving a signal from a new remote
+      p = await createPeer(false, from);
+      peersRef.current.set(from, p);
+    }
+    try {
+      p.signal(signal);
+    } catch (e) {
+      console.error("signal error:", e);
+    }
+  };
+
+  const createPeer = async (initiator, remoteSocketId) => {
+    // Ensure we have local stream
+    if (!localStreamRef.current) {
+      // mic permission only once
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      localStreamRef.current = stream;
+
+      // attach to local audio element (muted so no echo)
+      if (!localAudioRef.current) {
+        localAudioRef.current = document.createElement("audio");
+        localAudioRef.current.autoplay = true;
+        localAudioRef.current.muted = true;
+        localAudioRef.current.playsInline = true;
+        localAudioRef.current.id = "voice-audio-local";
+        document.body.appendChild(localAudioRef.current);
+      }
+      localAudioRef.current.srcObject = stream;
+
+      // apply current mute state to track
+      stream.getAudioTracks().forEach((t) => (t.enabled = !muted));
+    }
+
+    const peer = new Peer({
+      initiator,
+      trickle: true,
+      stream: localStreamRef.current,
+      config: { iceServers },
+    });
+
+    peer.on("signal", (signal) => {
+      socket.emit("voice:signal", {
+        roomCode,
+        to: remoteSocketId,
+        signal,
+      });
+    });
+
+    peer.on("stream", (remoteStream) => {
+      // Add/replace a remote <audio> tag
+      let audio = document.getElementById(`voice-audio-${remoteSocketId}`);
+      if (!audio) {
+        audio = document.createElement("audio");
+        audio.id = `voice-audio-${remoteSocketId}`;
+        audio.autoplay = true;
+        audio.playsInline = true;
+        document.body.appendChild(audio);
+      }
+      audio.srcObject = remoteStream;
+
+      // Track in React state (for UI badges, etc.)
+      setPeers((prev) => ({
+        ...prev,
+        [remoteSocketId]: { peer, stream: remoteStream },
+      }));
+    });
+
+    peer.on("close", () => handlePeerLeft({ socketId: remoteSocketId }));
+    peer.on("error", (e) => {
+      console.error("peer error:", e);
+      setError(e.message || "Peer error");
+    });
+
+    return peer;
+  };
+
+  const joinVoice = async () => {
+    try {
+      setConnecting(true);
+      setError(null);
+      // Get mic immediately so we can send to peers
+      if (!localStreamRef.current) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        localStreamRef.current = stream;
+        stream.getAudioTracks().forEach((t) => (t.enabled = !muted));
+      }
+      socket.emit("voice:join", { roomCode });
+      setJoined(true);
+    } catch (e) {
+      setError(e.message || "Failed to join voice");
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  // When server tells us current voice members, proactively connect
+  useEffect(() => {
+    if (!joined || !socket) return;
+
+    const handleRosterAndOffer = async ({ members }) => {
+      // Create initiator peers to everyone already in the voice room
+      for (const socketId of members) {
+        if (socketId === socket.id) continue;
+        if (!peersRef.current.get(socketId)) {
+          const p = await createPeer(true, socketId);
+          peersRef.current.set(socketId, p);
         }
-        audio.srcObject = remoteStream;
-        try { await audio.play(); } catch (e) {
-            console.debug("Autoplay blocked; will play after next user gesture.", e?.message);
-        }
+      }
     };
 
-    const removeRemoteAudio = (socketId) => {
-        const audio = document.getElementById(`audio-${socketId}`);
-        if (audio) {
-            audio.srcObject = null;
-            audio.remove();
-        }
-    };
+    socket.on("voice:roster", handleRosterAndOffer);
+    return () => socket.off("voice:roster", handleRosterAndOffer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [joined, socket]);
 
-    const cleanupPeers = () => {
-        peersRef.current.forEach((p, id) => {
-            try { p.destroy(); } catch { }
-            removeRemoteAudio(id);
-        });
-        peersRef.current.clear();
-        setPeers({});
-    };
+  const leaveVoice = () => {
+    socket.emit("voice:leave", { roomCode });
+    setJoined(false);
+    // destroy peers and streams
+    peersRef.current.forEach((p) => {
+      try { p.destroy(); } catch {}
+    });
+    peersRef.current.clear();
+    setPeers({});
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = null;
+    }
+    const localEl = document.getElementById("voice-audio-local");
+    if (localEl) { localEl.srcObject = null; localEl.remove(); }
+    // remove remote elements
+    Object.keys(peers).forEach((sid) => {
+      const el = document.getElementById(`voice-audio-${sid}`);
+      if (el) { el.srcObject = null; el.remove(); }
+    });
+  };
 
-    // Join voice: get mic + announce to room
-    const joinVoice = async () => {
-        setError(null);
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-            localStreamRef.current = stream;
+  const toggleMute = () => {
+    const next = !muted;
+    setMuted(next);
+    if (localStreamRef.current) {
+      localStreamRef.current.getAudioTracks().forEach((t) => (t.enabled = !next));
+    }
+    socket.emit("voice:mute", { roomCode, muted: next });
+  };
 
-            // Play your own audio locally (muted to avoid echo)
-            if (localAudioRef.current) {
-                localAudioRef.current.srcObject = stream;
-                try { await localAudioRef.current.play(); } catch { }
-            }
-
-            socket.emit("voice:join");
-            setJoined(true);
-            setMuted(false);
-            // ensure track enabled
-            stream.getAudioTracks().forEach(t => (t.enabled = true));
-        } catch (e) {
-            setError(e.message || "Microphone permission denied");
-        }
-    };
-
-    // Leave voice: stop tracks and tell others
-    const leaveVoice = () => {
-        socket.emit("voice:leave");
-        if (localStreamRef.current) {
-            localStreamRef.current.getTracks().forEach(t => t.stop());
-            localStreamRef.current = null;
-        }
-        if (localAudioRef.current) localAudioRef.current.srcObject = null;
-        cleanupPeers();
-        setJoined(false);
-    };
-
-    // Toggle mute (local only) + notify others for UI
-    const toggleMute = () => {
-        const stream = localStreamRef.current;
-        if (!stream) return;
-        const next = !muted;
-        stream.getAudioTracks().forEach(t => (t.enabled = !next)); // disabled when muted
-        setMuted(next);
-        socket.emit("voice:mute", { muted: next });
-    };
-
-    // Create a Peer to a specific target
-    const createPeer = (targetId, initiator) => {
-        const stream = localStreamRef.current;
-        const peer = new Peer({
-            initiator,
-            trickle: true,
-            stream,
-            config: {
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' }, // helpful extra STUN
-                    {
-                        // Free plan → TURN on 3478 (UDP & TCP)
-                        urls: [
-                            `turn:${process.env.NEXT_PUBLIC_TURN_HOST}:3480?transport=udp`,
-                            `turn:${process.env.NEXT_PUBLIC_TURN_HOST}:3480?transport=tcp`,
-                        ],
-                        username: process.env.NEXT_PUBLIC_TURN_USERNAME,
-                        credential: process.env.NEXT_PUBLIC_TURN_PASSWORD,
-                    },
-                ],
-                // For tough networks during testing, uncomment:
-                iceTransportPolicy: 'relay',
-            },
-        });
-        const pc = peer._pc;
-        if (pc) {
-            pc.addEventListener('iceconnectionstatechange', () =>
-                console.log('ICE', targetId, pc.iceConnectionState)
-            );
-            pc.addEventListener('connectionstatechange', () =>
-                console.log('PC', targetId, pc.connectionState)
-            );
-        }
-        peer.on('error', (err) => console.warn('peer error', targetId, err));
-        peer.on('connect', () => console.log('peer connected', targetId));
-
-        peer.on("signal", (signal) => {
-            socket.emit("voice:signal", { targetId, signal });
-        });
-
-        peer.on("stream", (remoteStream) => {
-            addRemoteAudio(targetId, remoteStream);
-            setPeers(prev => ({
-                ...prev,
-                [targetId]: { ...(prev[targetId] || {}), muted: false }
-            }));
-        });
-        peer.on("close", () => {
-            removeRemoteAudio(targetId);
-            peersRef.current.delete(targetId);
-            setPeers(prev => {
-                const copy = { ...prev };
-                delete copy[targetId];
-                return copy;
-            });
-            console.log('peer closed', targetId)
-        });
-
-        peersRef.current.set(targetId, peer);
-        return peer;
-    };
-
-    useEffect(() => {
-        if (!socket) return;
-
-        // Existing peers when you join
-        const onPeers = ({ peers: existing, you }) => {
-            // Create initiator peers to everyone already in the voice room
-            existing.forEach((pid) => createPeer(pid, true));
-        };
-
-        // A new user joined voice later; you create a non-initiator peer for them
-        const onUserJoined = ({ socketId }) => {
-            createPeer(socketId, false);
-        };
-
-        // Incoming WebRTC signal
-        const onSignal = ({ fromId, signal }) => {
-            if (!fromId || !signal) {
-                console.warn("Dropped bad signal payload:", { fromId, signal });
-                return;
-            }
-            let peer = peersRef.current.get(fromId);
-            if (!peer) {
-                // Create a receiver peer if it doesn't exist yet
-                peer = createPeer(fromId, false);
-            }
-            try {
-                peer.signal(signal);
-            } catch (e) {
-                console.error("peer.signal failed:", e, signal);
-            }
-        };
-
-        // A user left voice
-        const onUserLeft = ({ socketId }) => {
-            const peer = peersRef.current.get(socketId);
-            if (peer) peer.destroy();
-        };
-
-        // Someone toggled mute (purely for UI)
-        const onMute = ({ socketId, muted }) => {
-            setPeers(prev => ({
-                ...prev,
-                [socketId]: { ...(prev[socketId] || {}), muted: !!muted }
-            }));
-        };
-
-        socket.on("voice:peers", onPeers);
-        socket.on("voice:user-joined", onUserJoined);
-        socket.on("voice:signal", onSignal);
-        socket.on("voice:user-left", onUserLeft);
-        socket.on("voice:mute", onMute);
-
-        return () => {
-            socket.off("voice:peers", onPeers);
-            socket.off("voice:user-joined", onUserJoined);
-            socket.off("voice:signal", onSignal);
-            socket.off("voice:user-left", onUserLeft);
-            socket.off("voice:mute", onMute);
-        };
-    }, [socket]);
-
-    return (
-        <div className="bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg shadow p-6 border border-slate-200 dark:border-slate-700 transition-colors">
-            <h2 className="text-lg font-semibold mb-3">Voice</h2>
-
-            {error && <div className="mb-3 p-2 text-sm rounded bg-red-100 text-red-700">{error}</div>}
-
-            <div className="flex items-center gap-2 mb-4">
-                {!joined ? (
-                    <button
-                        onClick={joinVoice}
-                        className="px-3 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700"
-                    >
-                        Join Voice
-                    </button>
-                ) : (
-                    <>
-                        <button
-                            onClick={toggleMute}
-                            className={`px-3 py-2 rounded text-white ${muted ? "bg-gray-500 hover:bg-gray-600" : "bg-emerald-600 hover:bg-emerald-700"}`}
-                        >
-                            {muted ? "Unmute" : "Mute"}
-                        </button>
-                        <button
-                            onClick={leaveVoice}
-                            className="px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                        >
-                            Leave Voice
-                        </button>
-                    </>
-                )}
-            </div>
-
-            <audio ref={localAudioRef} autoPlay playsInline muted />
-
-            <div className="text-sm">
-                <div className="font-medium mb-2">Participants in voice:</div>
-                {Object.keys(peers).length === 0 ? (
-                    <div className="text-gray-500 dark:text-slate-400">No one else is in voice yet.</div>
-                ) : (
-                    <ul className="space-y-1">
-                        {Object.entries(peers).map(([sid, info]) => (
-                            <li key={sid} className="flex items-center justify-between p-2 rounded bg-gray-50 dark:bg-slate-900/40">
-                                <span className="font-mono text-xs">{sid.slice(0, 8)}</span>
-                                <span className={`text-xs px-2 py-0.5 rounded ${info.muted ? "bg-gray-200 dark:bg-slate-700" : "bg-green-100 text-green-800"}`}>
-                                    {info.muted ? "Muted" : "Speaking"}
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </div>
+  return (
+    <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-4 border border-slate-200 dark:border-slate-700">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-semibold">Voice</h2>
+        <div className="text-sm text-slate-500 dark:text-slate-400">
+          {Object.keys(peers).length + (joined ? 1 : 0)} in call
         </div>
-    );
+      </div>
+
+      {error && <div className="mb-3 text-red-600 text-sm">Audio error: {error}</div>}
+
+      {!joined ? (
+        <button
+          onClick={joinVoice}
+          disabled={connecting}
+          className="px-4 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+        >
+          {connecting ? "Joining…" : "Join voice"}
+        </button>
+      ) : (
+        <div className="flex gap-2">
+          <button
+            onClick={toggleMute}
+            className={`px-4 py-2 rounded ${muted ? "bg-slate-600" : "bg-emerald-600"} text-white hover:opacity-90`}
+          >
+            {muted ? "Unmute" : "Mute"}
+          </button>
+          <button
+            onClick={leaveVoice}
+            className="px-4 py-2 rounded bg-rose-600 text-white hover:bg-rose-700"
+          >
+            Leave
+          </button>
+        </div>
+      )}
+
+      {/* Tiny legend */}
+      <div className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+        Tip: everyone can mute/unmute themselves. No organiser privileges needed.
+      </div>
+    </div>
+  );
 }
