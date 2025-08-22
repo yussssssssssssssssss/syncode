@@ -20,8 +20,6 @@ const PORT = process.env.PORT || 3000;
 const prisma = require('./prisma.js');
 
 // In-memory per-room state
-const voiceRooms = new Map(); // roomCode -> Set<socketId>
-const voiceMuteState = new Map(); // roomCode -> Map<socketId, boolean>
 const roomStates = new Map();
 
 const io = new Server(server, {
@@ -241,108 +239,45 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Join voice room (requires the user to have joined the text room first so socket.roomCode exists)
-  socket.on('voice:join', ({ roomCode }) => {
-    if (!roomCode) return socket.emit('voice:error', { message: 'No roomCode' });
-    if (socket.roomCode !== roomCode) {
-      // Make sure they logically joined the same collab room
-      return socket.emit('voice:error', { message: 'Join the room before voice' });
-    }
-
-    let set = voiceRooms.get(roomCode);
-    if (!set) {
-      set = new Set();
-      voiceRooms.set(roomCode, set);
-    }
-    set.add(socket.id);
-
-    let m = voiceMuteState.get(roomCode);
-    if (!m) {
-      m = new Map();
-      voiceMuteState.set(roomCode, m);
-    }
-    // default muted=false means sending audio; we let client control the track
-    m.set(socket.id, false);
-
-    // Send roster to the joiner so they can initiate offers
-    socket.emit('voice:roster', { members: Array.from(set) });
-
-    // Let everyone know full participant list (for UI only)
-    io.to(roomCode).emit('voice:participants', {
-      participants: Array.from(set).map((sid) => ({
-        socketId: sid,
-        muted: m.get(sid) || false,
-      })),
-    });
-  });
-
-  // Leave voice
-  socket.on('voice:leave', ({ roomCode }) => {
-    if (!roomCode) return;
-    const set = voiceRooms.get(roomCode);
-    if (set) {
-      set.delete(socket.id);
-      if (set.size === 0) voiceRooms.delete(roomCode);
-    }
-    const m = voiceMuteState.get(roomCode);
-    if (m) {
-      m.delete(socket.id);
-      if (m.size === 0) voiceMuteState.delete(roomCode);
-    }
-    socket.to(roomCode).emit('voice:peer-left', { socketId: socket.id });
-    io.to(roomCode).emit('voice:participants', {
-      participants: set ? Array.from(set).map((sid) => ({
-        socketId: sid,
-        muted: m?.get(sid) || false,
-      })) : [],
-    });
-  });
-
-  // Relay WebRTC signals
-  socket.on('voice:signal', ({ roomCode, to, signal }) => {
-    if (!roomCode || !to || !signal) return;
-    const set = voiceRooms.get(roomCode);
-    if (!set || !set.has(socket.id)) {
-      return socket.emit('voice:error', { message: 'Not in voice room' });
-    }
-    io.to(to).emit('voice:signal', { from: socket.id, signal });
-  });
-
-  // Mute/unmute self (UI indicator broadcast)
-  socket.on('voice:mute', ({ roomCode, muted }) => {
-    if (!roomCode) return;
-    const m = voiceMuteState.get(roomCode);
-    if (m) m.set(socket.id, !!muted);
-    io.to(roomCode).emit('voice:participants', {
-      participants: Array.from(voiceRooms.get(roomCode) || []).map((sid) => ({
-        socketId: sid,
-        muted: m?.get(sid) || false,
-      })),
-    });
-  });
-
   // Handle disconnection
-  socket.on('disconnect', () => {
-    const roomCode = socket.roomCode;
-    if (roomCode) {
-      const set = voiceRooms.get(roomCode);
-      if (set && set.has(socket.id)) {
-        set.delete(socket.id);
-        if (set.size === 0) voiceRooms.delete(roomCode);
-        const m = voiceMuteState.get(roomCode);
-        if (m) {
-          m.delete(socket.id);
-          if (m.size === 0) voiceMuteState.delete(roomCode);
-        }
-        socket.to(roomCode).emit('voice:peer-left', { socketId: socket.id });
-        io.to(roomCode).emit('voice:participants', {
-          participants: set ? Array.from(set).map((sid) => ({
-            socketId: sid,
-            muted: m?.get(sid) || false,
-          })) : [],
+  socket.on('disconnect', async () => {
+    if (socket.roomCode) {
+      try {
+        // Get updated participants list
+        const room = await prisma.room.findUnique({
+          where: { code: socket.roomCode },
+          include: {
+            participants: {
+              include: { user: true }
+            }
+          }
         });
+
+        if (room) {
+          const participants = room.participants.map(p => ({
+            id: p.user.id,
+            name: p.user.name,
+            email: p.user.email,
+            role: p.role
+          }));
+
+          // Emit user left event
+          socket.to(socket.roomCode).emit('userLeft', {
+            user: {
+              id: socket.userId,
+              name: socket.userName,
+              role: socket.userRole
+            },
+            participants
+          });
+        }
+
+        console.log(`User ${socket.userName} left room ${socket.roomCode}`);
+      } catch (error) {
+        console.error('Error handling disconnect:', error);
       }
     }
+    console.log(`User ${socket.userName} (${socket.userId}) disconnected`);
   });
 });
 
