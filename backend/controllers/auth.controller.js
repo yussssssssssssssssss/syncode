@@ -3,15 +3,6 @@ const prisma = new PrismaClient();
 const bcrypt = require('bcryptjs');
 const generateToken = require('../utils/jwtToken');
 
-// Production cookie options for Vercel + Render deployment
-const getCookieOptions = (httpOnly = true) => ({
-  httpOnly,
-  secure: true, // Always true for production (both Vercel and Render use HTTPS)
-  sameSite: 'none', // CRITICAL: Must be 'none' for cross-origin cookies
-  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-  path: '/' // Ensure cookie works across all paths
-});
-
 exports.register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -33,20 +24,27 @@ exports.register = async (req, res) => {
 
     const token = generateToken(user);
 
-    // Set httpOnly cookie for security (for API authentication)
-    res.cookie('token', token, getCookieOptions(true));
+    // Set httpOnly cookie for security
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
 
     // Set non-httpOnly cookie for Socket.IO access
-    res.cookie('socketToken', token, getCookieOptions(false));
+    res.cookie('socketToken', token, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
 
     // Set session data for Socket.IO authentication
     if (req.session) {
       req.session.userId = user.id;
       req.session.userName = user.name;
     }
-
-    console.log('User registered and cookies set:', user.email);
-    console.log('Cookie options:', getCookieOptions(true));
 
     res.status(201).json({
       message: 'User registered successfully',
@@ -74,20 +72,27 @@ exports.login = async (req, res) => {
 
     const token = generateToken(user);
 
-    // Set httpOnly cookie for security (for API authentication)
-    res.cookie('token', token, getCookieOptions(true));
+    // Set httpOnly cookie for security
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
 
     // Set non-httpOnly cookie for Socket.IO access
-    res.cookie('socketToken', token, getCookieOptions(false));
+    res.cookie('socketToken', token, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000
+    });
 
     // Set session data for Socket.IO authentication
     if (req.session) {
       req.session.userId = user.id;
       req.session.userName = user.name;
     }
-
-    console.log('User logged in and cookies set:', user.email);
-    console.log('Cookie options:', getCookieOptions(true));
 
     res.status(200).json({
       message: 'Login successful',
@@ -106,11 +111,18 @@ exports.logout = (req, res) => {
     req.session.destroy();
   }
   
-  // Clear both cookies with same options used to set them
-  res.clearCookie('token', getCookieOptions(true));
-  res.clearCookie('socketToken', getCookieOptions(false));
+  // Clear both cookies
+  res.clearCookie('token', {
+    httpOnly: true,
+    sameSite: 'Strict',
+    secure: process.env.NODE_ENV === 'production'
+  });
   
-  console.log('User logged out and cookies cleared');
+  res.clearCookie('socketToken', {
+    httpOnly: false,
+    sameSite: 'Strict',
+    secure: process.env.NODE_ENV === 'production'
+  });
   
   res.status(200).json({ message: 'Logged out successfully' });
 };
