@@ -92,6 +92,22 @@ export default function VoiceChat({ socket }) {
       initiator,
       trickle: true,
       stream,
+      config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' }, // helpful extra STUN
+        {
+          // Free plan → TURN on 3478 (UDP & TCP)
+          urls: [
+            `turn:${process.env.NEXT_PUBLIC_TURN_HOST}:3480?transport=udp`,
+            `turn:${process.env.NEXT_PUBLIC_TURN_HOST}:3480?transport=tcp`,
+          ],
+          username: process.env.NEXT_PUBLIC_TURN_USERNAME,
+          credential: process.env.NEXT_PUBLIC_TURN_PASSWORD,
+        },
+      ],
+      // For tough networks during testing, uncomment:
+      // iceTransportPolicy: 'relay',
+    },
     });
 
     peer.on("signal", (signal) => {
