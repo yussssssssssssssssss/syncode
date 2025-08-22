@@ -201,6 +201,8 @@ io.on('connection', (socket) => {
   // Explicit leave handler (client-requested)
   socket.on('leaveRoom', async () => {
     try {
+  // mark socket as explicitly left to avoid duplicate userLeft on subsequent disconnect
+  socket._explicitlyLeft = true;
       if (!socket.roomCode) return;
       const room = await prisma.room.findUnique({ where: { code: socket.roomCode.toUpperCase() } });
       if (!room) return;
@@ -224,7 +226,7 @@ io.on('connection', (socket) => {
 
       // Make socket leave the room
       socket.leave(socket.roomCode);
-      delete socket.roomCode;
+  delete socket.roomCode;
     } catch (err) {
       console.error('Error handling leaveRoom:', err);
     }
@@ -314,11 +316,16 @@ io.on('connection', (socket) => {
     } catch (e) {
       console.error('Error cleaning userSockets map:', e);
     }
+    // If already explicitly left via leaveRoom, skip room cleanup to avoid duplicate userLeft
+    if (socket._explicitlyLeft) {
+      console.log(`Socket ${socket.id} explicitly left earlier; skipping disconnect cleanup.`);
+    }
+
     if (socket.roomCode) {
       try {
         // If user has other active sockets, don't remove their participant entry
         const remainingSockets = userSockets.get(socket.userId) || [];
-        if (remainingSockets.length === 0) {
+  if (remainingSockets.length === 0) {
           // Find the room by code
           const room = await prisma.room.findUnique({ where: { code: socket.roomCode.toUpperCase() } });
           if (room) {

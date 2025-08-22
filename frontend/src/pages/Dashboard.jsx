@@ -37,11 +37,15 @@ export default function Dashboard() {
     
     setLoading(true);
     try {
+      // try to include socketToken cookie as Authorization header in case cookie wasn't sent
+      const cookies = document.cookie.split(';').reduce((acc, c) => { const [k,v] = c.split('='); acc[k?.trim()] = v; return acc; }, {});
+      const authHeader = cookies.socketToken ? `Bearer ${cookies.socketToken}` : null;
       const res = await fetch(`${BASE_URL}/api/room/create`, {
         method: "POST",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
+          ...(authHeader ? { Authorization: authHeader } : {})
         },
         body: JSON.stringify({ username: user.name }),
       });
@@ -69,14 +73,18 @@ export default function Dashboard() {
     
     setLoading(true);
     try {
+      const cookies = document.cookie.split(';').reduce((acc, c) => { const [k,v] = c.split('='); acc[k?.trim()] = v; return acc; }, {});
+      const authHeader = cookies.socketToken ? `Bearer ${cookies.socketToken}` : null;
       const res = await fetch(`${BASE_URL}/api/room/join`, {
         method: "POST",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
+          ...(authHeader ? { Authorization: authHeader } : {})
         },
         body: JSON.stringify({ code: roomCode }),
       });
+      
       
       const data = await res.json();
       

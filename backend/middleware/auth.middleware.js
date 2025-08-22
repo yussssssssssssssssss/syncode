@@ -2,7 +2,11 @@ const jwt = require('jsonwebtoken');
 const prisma = require('../prisma');
 
 const protect = async (req, res, next) => {
-  const token = req.cookies.token;
+  // Accept token from cookie or Authorization header as fallback
+  let token = req.cookies.token;
+  if (!token && req.headers.authorization) {
+    token = req.headers.authorization.replace('Bearer ', '');
+  }
 
   if (!token)
     return res.status(401).json({ message: 'Not authenticated' });

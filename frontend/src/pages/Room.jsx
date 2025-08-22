@@ -49,11 +49,15 @@ export default function Room() {
     const joinRoom = async () => {
       try {
         // First, try to join the room with the code
+        // If cookies are blocked on mobile, try sending socketToken as Authorization header
+        const cookies = document.cookie.split(';').reduce((acc, c) => { const [k,v] = c.split('='); acc[k?.trim()] = v; return acc; }, {});
+        const authHeader = cookies.socketToken ? `Bearer ${cookies.socketToken}` : null;
         const joinRes = await fetch(`${BASE_URL}/api/room/join`, {
           method: "POST",
           credentials: "include",
           headers: {
             "Content-Type": "application/json",
+            ...(authHeader ? { Authorization: authHeader } : {})
           },
           body: JSON.stringify({ code: roomCode }),
         });
@@ -161,16 +165,7 @@ export default function Room() {
           }
         });
 
-        socketInstance.on('userLeft', (data) => {
-          console.log('User left:', data.user);
-          // update participants list from server payload when available
-          if (data.participants) setUsers(data.participants);
-          setMessages(prev => [...prev, {
-            type: 'system',
-            message: `${data.user.name} left the room`,
-            timestamp: new Date().toISOString()
-          }]);
-        });
+  // (userLeft handled later once) - single handler will update participants and show message
 
         // WebRTC signaling handlers
     socketInstance.on('webrtc-offer', async ({ from, sdp, fromUserId }) => {
