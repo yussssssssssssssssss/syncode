@@ -75,18 +75,18 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors flex items-center justify-center px-4">
       <div className="max-w-md w-full">
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="bg-white dark:bg-slate-800 dark:text-slate-100 rounded-2xl shadow-xl p-8 border border-slate-200 dark:border-slate-700 transition-colors">
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
-            <p className="text-gray-600">Sign in to your Syncode account</p>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">Welcome Back</h1>
+            <p className="text-slate-600 dark:text-slate-300">Sign in to your Syncode account</p>
           </div>
 
           {/* Error Display */}
           {generalError && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg">
               <div className="flex">
                 <div className="flex-shrink-0">
                   <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -94,7 +94,7 @@ export default function Login() {
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm text-red-800">{generalError}</p>
+                  <p className="text-sm text-red-800 dark:text-red-300">{generalError}</p>
                 </div>
               </div>
             </div>
@@ -103,7 +103,7 @@ export default function Login() {
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">
                 Email Address
               </label>
               <input
@@ -112,8 +112,8 @@ export default function Login() {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                  errors.email ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
+                className={`w-full px-4 py-3 border rounded-lg bg-white dark:bg-slate-900/60 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                  errors.email ? 'border-red-300 focus:ring-red-500' : 'border-slate-300 dark:border-slate-600'
                 }`}
                 placeholder="Enter your email"
                 disabled={loading}
@@ -124,7 +124,7 @@ export default function Login() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">
                 Password
               </label>
               <input
@@ -133,8 +133,8 @@ export default function Login() {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
-                  errors.password ? 'border-red-300 focus:ring-red-500' : 'border-gray-300'
+                className={`w-full px-4 py-3 border rounded-lg bg-white dark:bg-slate-900/60 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${
+                  errors.password ? 'border-red-300 focus:ring-red-500' : 'border-slate-300 dark:border-slate-600'
                 }`}
                 placeholder="Enter your password"
                 disabled={loading}
@@ -147,10 +147,10 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className={`w-full py-3 px-4 border border-transparent rounded-lg font-medium text-white transition-colors ${
+              className={`w-full py-3 px-4 border border-transparent rounded-lg font-medium text-white transition-transform ${
                 loading
                   ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
+                  : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:scale-[1.01]'
               }`}
             >
               {loading ? (
@@ -169,7 +169,7 @@ export default function Login() {
 
           {/* Footer */}
           <div className="mt-8 text-center">
-            <p className="text-gray-600">
+            <p className="text-gray-600 dark:text-slate-300">
               Don't have an account?{" "}
               <Link to="/register" className="font-medium text-blue-600 hover:text-blue-500 transition-colors">
                 Sign up here

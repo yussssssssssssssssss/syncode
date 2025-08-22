@@ -4,6 +4,7 @@ import { io } from "socket.io-client";
 import { BASE_URL } from "../config";
 import Header from "../components/Header";
 import CollaborativeEditor from "../components/CollaborativeEditor";
+import { FaCopy, FaCheck } from "react-icons/fa";
 
 export default function Room() {
   const { id: roomCode } = useParams(); // This is actually the room code, not ID
@@ -17,6 +18,7 @@ export default function Room() {
   const [userRole, setUserRole] = useState(null);
   const [connected, setConnected] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
+  const [copied, setCopied] = useState(false);
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
 
@@ -203,36 +205,53 @@ export default function Room() {
   };
 
   if (loading) return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
       <Header />
-      <div className="p-6 text-gray-600">Loading room...</div>
+      <div className="p-6 text-slate-600 dark:text-slate-300">Loading room...</div>
     </div>
   );
 
   if (error) return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
       <Header />
       <div className="p-6 text-red-500">Error: {error}</div>
     </div>
   );
 
   if (!room) return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
       <Header />
       <div className="p-6">Room not found</div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
       <Header />
       <div className="p-6">
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <div className="bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg shadow p-6 mb-6 border border-slate-200 dark:border-slate-700 transition-colors">
           <div className="flex justify-between items-center mb-4">
-            <h1 className="text-2xl font-bold">Room: {room.code}</h1>
+            <div className="flex items-center gap-2 group">
+              <h1 className="text-2xl font-bold">Room: <span className="bg-gradient-to-r from-blue-500 to-emerald-500 bg-clip-text text-transparent">{room.code}</span></h1>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(room.code);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="p-2 text-gray-500 hover:text-emerald-500 dark:text-slate-400 dark:hover:text-emerald-400 transition-colors rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 group relative top-[1px]"
+                title="Copy room code"
+              >
+                {copied ? (
+                  <FaCheck className="w-4 h-4 text-emerald-500 animate-bounce" />
+                ) : (
+                  <FaCopy className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                )}
+              </button>
+            </div>
             <div className="flex items-center space-x-2">
               <div className={`w-3 h-3 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-gray-600 dark:text-gray-300">
                 {connected ? 'Connected' : 'Disconnected'}
               </span>
             </div>
@@ -242,21 +261,40 @@ export default function Room() {
               Connection Error: {connectionError}
             </div>
           )}
-          <p className="text-gray-700">Room Code: <span className="font-mono font-semibold">{room.code}</span></p>
-          <p className="text-gray-700 mt-2">Participants: {users.length}</p>
+          <div className="flex items-center gap-3 group">
+            <p className="text-gray-700 dark:text-slate-300">Room Code: 
+              <span className="font-mono font-semibold ml-2">{room.code}</span>
+            </p>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(room.code);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+              className="p-2 text-gray-500 hover:text-emerald-500 dark:text-slate-400 dark:hover:text-emerald-400 transition-colors rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 group"
+              title="Copy room code"
+            >
+              {copied ? (
+                <FaCheck className="w-4 h-4 text-emerald-500 animate-bounce" />
+              ) : (
+                <FaCopy className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+              )}
+            </button>
+          </div>
+          <p className="text-gray-700 dark:text-slate-300 mt-2">Participants: {users.length}</p>
           {userRole && (
-            <p className="text-gray-700 mt-1">Your role: <span className="font-semibold capitalize">{userRole}</span></p>
+            <p className="text-gray-700 dark:text-slate-300 mt-1">Your role: <span className="font-semibold capitalize">{userRole}</span></p>
           )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Participants List */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow p-6 mb-6">
+            <div className="bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg shadow p-6 mb-6 border border-slate-200 dark:border-slate-700 transition-colors">
               <h2 className="text-lg font-semibold mb-4">Participants ({users.length})</h2>
               <div className="space-y-2">
                 {users.map((user) => (
-                  <div key={user.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                  <div key={user.id} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-slate-900/40 rounded">
                     <span className="font-medium">{user.name}</span>
                     <span className={`px-2 py-1 rounded text-xs ${
                       user.role === 'organiser' 
@@ -271,24 +309,24 @@ export default function Room() {
             </div>
 
             {/* Chat Section */}
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg shadow p-6 border border-slate-200 dark:border-slate-700 transition-colors">
               <h2 className="text-lg font-semibold mb-4">Chat</h2>
-              <div className="h-64 overflow-y-auto border rounded p-3 mb-4 bg-gray-50">
+              <div className="h-64 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded p-3 mb-4 bg-gray-50 dark:bg-slate-900/40">
                 {messages.length === 0 ? (
-                  <p className="text-gray-500 text-center mt-8">No messages yet. Start the conversation!</p>
+                  <p className="text-gray-500 dark:text-slate-400 text-center mt-8">No messages yet. Start the conversation!</p>
                 ) : (
                   <div className="space-y-2">
                     {messages.map((msg, index) => (
                       <div key={index} className={`p-2 rounded ${
                         msg.type === 'system' 
                           ? 'bg-blue-100 text-blue-800 text-center text-sm' 
-                          : 'bg-white border'
+                          : 'bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700'
                       }`}>
                         {msg.type === 'chat' ? (
                           <div>
                             <div className="flex justify-between items-center mb-1">
                               <span className="font-semibold text-sm">{msg.user.name}</span>
-                              <span className="text-xs text-gray-500">
+                              <span className="text-xs text-gray-500 dark:text-slate-400">
                                 {new Date(msg.timestamp).toLocaleTimeString()}
                               </span>
                             </div>
@@ -309,13 +347,13 @@ export default function Room() {
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   placeholder={connected ? "Type your message..." : "Connecting..."}
-                  className="flex-1 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900/60 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-slate-100"
                   disabled={!connected}
                 />
                 <button
                   type="submit"
                   disabled={!connected || !newMessage.trim()}
-                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Send
                 </button>

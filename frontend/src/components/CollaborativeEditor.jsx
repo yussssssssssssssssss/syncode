@@ -5,7 +5,7 @@ import { JUDGE0_CONFIG } from '../config';
 const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
   const [code, setCode] = useState('// Welcome to Syncode!\n// Start coding collaboratively with your team.\n\nfunction helloWorld() {\n  console.log("Hello from Syncode!");\n  return "Collaborative coding is awesome!";\n}\n\n// Try editing this code and see it sync in real-time!');
   const [language, setLanguage] = useState('javascript');
-  const [theme, setTheme] = useState('vs-dark');
+  const [theme, setTheme] = useState(() => (document.documentElement.classList.contains('dark') ? 'vs-dark' : 'vs-light'));
   const [isConnected, setIsConnected] = useState(false);
   const [output, setOutput] = useState('');
   const [compiling, setCompiling] = useState(false);
@@ -98,6 +98,16 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
       socket.off('codeSync');
     };
   }, [socket, roomCode]);
+
+  // Sync Monaco theme with app theme changes
+  useEffect(() => {
+    const handler = (e) => {
+      const next = e?.detail?.theme === 'dark' ? 'vs-dark' : 'vs-light';
+      setTheme(next);
+    };
+    window.addEventListener('themechange', handler);
+    return () => window.removeEventListener('themechange', handler);
+  }, []);
 
   const handleEditorDidMount = (editor, monaco) => {
     editorRef.current = editor;
@@ -412,16 +422,16 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
   ];
 
   return (
-    <div className="bg-white rounded-lg shadow">
+    <div className="bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg shadow border border-slate-200 dark:border-slate-700 transition-colors">
       {/* Editor Toolbar */}
-      <div className="flex items-center justify-between p-4 border-b bg-gray-50">
+      <div className="flex items-center justify-between p-4 border-b bg-gray-50 dark:bg-slate-900/40 border-slate-200 dark:border-slate-700">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
-            <label className="text-sm font-medium text-gray-700">Language:</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-slate-200">Language:</label>
             <select
               value={language}
               onChange={(e) => handleLanguageChange(e.target.value)}
-              className="px-3 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900/60 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-slate-100"
             >
               {languageOptions.map(option => (
                 <option key={option.value} value={option.value}>
@@ -432,11 +442,11 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
           </div>
           
           <div className="flex items-center space-x-2">
-            <label className="text-sm font-medium text-gray-700">Theme:</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-slate-200">Theme:</label>
             <select
               value={theme}
               onChange={(e) => handleThemeChange(e.target.value)}
-              className="px-3 py-1 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-3 py-1 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900/60 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-slate-100"
             >
               {themeOptions.map(option => (
                 <option key={option.value} value={option.value}>
@@ -450,7 +460,7 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
         <div className="flex items-center space-x-2">
           <div className="flex items-center space-x-2">
             <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-gray-600 dark:text-slate-300">
               {isConnected ? 'Synced' : 'Disconnected'}
             </span>
           </div>
@@ -458,10 +468,10 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
           <button
             onClick={handleRunCode}
             disabled={compiling}
-            className={`px-3 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-green-500 transition-colors ${
+            className={`px-3 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-transform ${
               compiling 
                 ? 'bg-gray-400 cursor-not-allowed' 
-                : 'bg-green-500 hover:bg-green-600 text-white'
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white hover:scale-[1.02]'
             }`}
           >
             {compiling ? (
@@ -479,7 +489,7 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
           
           <button
             onClick={handleSaveCode}
-            className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 hover:scale-[1.02] transition-transform"
           >
             Save
           </button>
@@ -527,16 +537,16 @@ const CollaborativeEditor = ({ socket, roomCode, userRole }) => {
 
       {/* Output Panel */}
       {output && (
-        <div className="border-t bg-gray-50 p-4">
+        <div className="border-t border-slate-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/40 p-4 transition-colors">
           <h3 className="text-sm font-semibold mb-2">Code Output:</h3>
-          <pre className="text-sm bg-white border rounded p-3 overflow-auto max-h-32 whitespace-pre-wrap">
+          <pre className="text-sm bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded p-3 overflow-auto max-h-32 whitespace-pre-wrap">
             {output}
           </pre>
         </div>
       )}
 
       {/* Status Bar */}
-      <div className="flex items-center justify-between p-2 bg-gray-100 text-xs text-gray-600 border-t">
+      <div className="flex items-center justify-between p-2 bg-gray-100 dark:bg-slate-900/40 text-xs text-gray-600 dark:text-slate-300 border-t border-slate-200 dark:border-slate-700 transition-colors">
         <div className="flex items-center space-x-4">
           <span>Room: {roomCode}</span>
           <span>Role: {userRole}</span>

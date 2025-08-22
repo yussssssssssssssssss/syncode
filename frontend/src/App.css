@@ -1,1 +1,18 @@
 @import "tailwindcss";
+
+/* Custom Animations */
+.animate-fadeIn {
+	animation: fadeIn 1s cubic-bezier(0.4,0,0.2,1) both;
+}
+.animate-gradientMove {
+	background-size: 200% 200%;
+	animation: gradientMove 3s ease-in-out infinite alternate;
+}
+@keyframes fadeIn {
+	0% { opacity: 0; transform: translateY(20px); }
+	100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes gradientMove {
+	0%, 100% { background-position: 0% 50%; }
+	50% { background-position: 100% 50%; }
+}
