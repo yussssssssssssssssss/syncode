@@ -5,6 +5,7 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const session = require('express-session');
 const jwt = require('jsonwebtoken');
+const cookie = require('cookie');
 require('dotenv').config();
 
 const protect = require('./middleware/auth.middleware.js');
@@ -58,17 +59,22 @@ app.use('/api/room', protect, roomRoutes);
 // Socket.IO middleware for authentication using JWT
 io.use(async (socket, next) => {
   try {
-    const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.replace('Bearer ', '');
+    // Accept token from auth, Authorization, or cookies (token or socketToken)
+    const cookies = cookie.parse(socket.handshake.headers.cookie || '');
+    const token =
+      socket.handshake.auth?.token ||
+      socket.handshake.headers.authorization?.replace('Bearer ', '') ||
+      cookies.token ||                // httpOnly cookie used by REST
+      cookies.socketToken;            // non-httpOnly cookie (if present)
+
     if (!token) return next(new Error('Authentication required'));
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await prisma.user.findUnique({ where: { id: decoded.id } });
-
     if (!user) return next(new Error('Invalid user'));
 
     socket.userId = user.id;
     socket.userName = user.name || user.email;
-    console.log(`Socket.IO authenticated: ${socket.userName}`);
     next();
   } catch (err) {
     console.error('Socket.IO auth failed:', err.message);

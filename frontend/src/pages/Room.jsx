@@ -31,16 +31,7 @@ export default function Room() {
   }, [messages]);
 
   // Helper function to get JWT token from cookies
-  const getJWTToken = () => {
-    const cookies = document.cookie.split(';');
-    for (let cookie of cookies) {
-      const [name, value] = cookie.trim().split('=');
-      if (name === 'socketToken') {
-        return value;
-      }
-    }
-    return null;
-  };
+  
 
   useEffect(() => {
     // Check if user is logged in
@@ -79,22 +70,15 @@ export default function Room() {
           setUsers(usersData.users || []);
         }
 
-        // Get JWT token for Socket.IO authentication
-        const token = getJWTToken();
-        if (!token) {
-          throw new Error("No authentication token found");
-        }
+        
 
         // Initialize Socket.IO connection
         console.log("Initializing Socket.IO connection...");
-        const socketInstance = io("http://localhost:3000", {
-          withCredentials: true,
-          transports: ['websocket', 'polling'],
-          timeout: 10000,
-          auth: {
-            token: token
-          }
-        });
+        const socketInstance = io(BASE_URL, {
+           withCredentials: true,
+           transports: ['websocket', 'polling'],
+           timeout: 10000
+         });
 
         socketInstance.on("connect", () => {
           console.log("✅ Connected to WebSocket server");
