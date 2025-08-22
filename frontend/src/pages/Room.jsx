@@ -132,12 +132,13 @@ export default function Room() {
         });
 
         // WebRTC signaling handlers
-        socketInstance.on('webrtc-offer', async ({ from, sdp, fromUserId }) => {
+    socketInstance.on('webrtc-offer', async ({ from, sdp, fromUserId }) => {
           try {
             console.log('Received offer from', from);
-            let pc = pcsRef.current.get(from);
-            if (!pc) pc = createPeer(from, socketInstance, true);
-            await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      let pc = pcsRef.current.get(from);
+      // create peer as answerer (do NOT auto-create offer)
+      if (!pc) pc = createPeer(from, socketInstance, false);
+      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
             // If we have local stream (unmuted), add tracks
             if (localStreamRef.current) {
               for (const track of localStreamRef.current.getTracks()) {
@@ -273,7 +274,7 @@ export default function Room() {
 
     pcsRef.current.set(remoteSocketId, pc);
 
-    pc.onicecandidate = (event) => {
+  pc.onicecandidate = (event) => {
       if (event.candidate) {
         socketInstance.emit('webrtc-ice', { target: remoteSocketId, candidate: event.candidate });
       }
@@ -297,16 +298,29 @@ export default function Room() {
       }
     };
 
-    if (isOfferer) {
-      // if we are the offerer, and we have a local stream (unmuted), add tracks
-      if (localStreamRef.current) {
+    // Use onnegotiationneeded to handle renegotiation safely
+    pc.onnegotiationneeded = async () => {
+      try {
+        // Only create offer if signaling state is stable
+        if (pc.signalingState !== 'stable') return;
+        // If we have local tracks and we are the initiator (isOfferer true), create offer
+        if (isOfferer) {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          socketInstance.emit('webrtc-offer', { target: remoteSocketId, sdp: pc.localDescription });
+        }
+      } catch (err) {
+        console.error('Negotiation error:', err);
+      }
+    };
+
+    // If we are the offerer and have a local stream, add tracks now
+    if (isOfferer && localStreamRef.current) {
+      try {
         for (const track of localStreamRef.current.getTracks()) {
           pc.addTrack(track, localStreamRef.current);
         }
-      }
-      pc.createOffer().then(offer => pc.setLocalDescription(offer)).then(() => {
-        socketInstance.emit('webrtc-offer', { target: remoteSocketId, sdp: pc.localDescription });
-      }).catch(e => console.error('Offer error', e));
+      } catch (e) { console.error('Error adding tracks for offerer', e); }
     }
 
     return pc;
@@ -337,23 +351,51 @@ export default function Room() {
     // notify others
     if (socket) socket.emit('voice-toggle', { muted: newMuted });
     // add or remove tracks from existing peer connections
-    pcsRef.current.forEach((pc, remoteId) => {
+    for (const [remoteId, pc] of pcsRef.current.entries()) {
       try {
-        // remove all local senders
+        // Replace existing audio sender track if possible
+        const audioTrack = localStreamRef.current ? localStreamRef.current.getAudioTracks()[0] : null;
+        let replaced = false;
         pc.getSenders().forEach(sender => {
-          if (sender.track && sender.track.kind === 'audio') pc.removeTrack(sender);
+          if (sender.track && sender.track.kind === 'audio') {
+            try {
+              if (audioTrack) {
+                sender.replaceTrack(audioTrack);
+              } else {
+                // if no local audio track, disable by replacing with null
+                sender.replaceTrack(null);
+              }
+              replaced = true;
+            } catch (e) {
+              console.warn('replaceTrack failed, will fallback to remove/add', e);
+            }
+          }
         });
-        if (!newMuted && localStreamRef.current) {
-          localStreamRef.current.getTracks().forEach(track => pc.addTrack(track, localStreamRef.current));
-          // renegotiate by creating an offer
-          pc.createOffer().then(offer => pc.setLocalDescription(offer)).then(() => {
+        // If replaceTrack wasn't possible, fallback to remove/add and safe renegotiation
+        if (!replaced) {
+          pc.getSenders().forEach(sender => {
+            if (sender.track && sender.track.kind === 'audio') {
+              try { pc.removeTrack(sender); } catch(e){}
+            }
+          });
+          if (!newMuted && localStreamRef.current) {
+            localStreamRef.current.getTracks().forEach(track => pc.addTrack(track, localStreamRef.current));
+          }
+        }
+        // Trigger renegotiation when stable
+        if (pc.signalingState === 'stable') {
+          try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
             if (socket) socket.emit('webrtc-offer', { target: remoteId, sdp: pc.localDescription });
-          }).catch(e => console.error('Reoffer error', e));
+          } catch (e) {
+            console.error('Reoffer error after mute toggle', e);
+          }
         }
       } catch (e) {
         console.error('Error toggling mute on pc', e);
       }
-    });
+    }
   };
 
   if (loading) return (
