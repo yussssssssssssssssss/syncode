@@ -1,9 +1,8 @@
-// Base URL for your backend API (switches via env vars)
-export const BASE_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+export const BASE_URL = "https://syncode-dc49.onrender.com";
 
-// Judge0 API configuration (from env vars for security)
+// Judge0 API configuration for external compilation
 export const JUDGE0_CONFIG = {
-  API_URL: import.meta.env.VITE_JUDGE0_URL || 'https://judge0-ce.p.rapidapi.com',
-  API_KEY: import.meta.env.VITE_JUDGE0_API_KEY, 
-  HOST: import.meta.env.VITE_JUDGE0_HOST || 'judge0-ce.p.rapidapi.com'
+  API_URL: 'https://judge0-ce.p.rapidapi.com',
+  API_KEY: 'b55bb656e1msh0712685421aa96fp157b6ejsn0a6c2307d181', // Get from https://rapidapi.com/judge0-official/api/judge0-ce
+  HOST: 'judge0-ce.p.rapidapi.com'
 };
