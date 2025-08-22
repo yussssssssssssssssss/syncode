@@ -16,10 +16,3 @@
 	0%, 100% { background-position: 0% 50%; }
 	50% { background-position: 100% 50%; }
 }
-
-/* Smooth theme transitions */
-html, body, #root { transition: background-color 320ms ease, color 320ms ease; }
-
-/* button glow */
-.glow-btn { box-shadow: 0 6px 24px rgba(16,185,129,0.18); transition: box-shadow 200ms ease, transform 200ms ease; }
-.glow-btn:hover { box-shadow: 0 12px 48px rgba(20,184,166,0.28); }
