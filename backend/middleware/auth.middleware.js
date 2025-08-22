@@ -1,6 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { PrismaClient } = require('../generated/prisma');
-const prisma = new PrismaClient();
+const prisma = require('../prisma');
 
 const protect = async (req, res, next) => {
   const token = req.cookies.token;

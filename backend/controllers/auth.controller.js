@@ -1,5 +1,4 @@
-const { PrismaClient } = require('../generated/prisma');
-const prisma = new PrismaClient();
+const prisma = require('../prisma');
 const bcrypt = require('bcryptjs');
 const generateToken = require('../utils/jwtToken');
 
@@ -28,7 +27,7 @@ exports.register = async (req, res) => {
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Strict',
+      sameSite: 'none',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
@@ -36,7 +35,7 @@ exports.register = async (req, res) => {
     res.cookie('socketToken', token, {
       httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Strict',
+      sameSite: 'none',
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     });
 
@@ -76,7 +75,7 @@ exports.login = async (req, res) => {
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Strict',
+      sameSite: 'none',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
@@ -84,7 +83,7 @@ exports.login = async (req, res) => {
     res.cookie('socketToken', token, {
       httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'Strict',
+      sameSite: 'none',
       maxAge: 7 * 24 * 60 * 60 * 1000
     });
 

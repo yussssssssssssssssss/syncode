@@ -1,5 +1,4 @@
-const { PrismaClient } = require('../generated/prisma');
-const prisma = new PrismaClient();
+const prisma = require('../prisma');
 
 // Helper: Generate a unique 6-character room code
 const generateRoomCode = () =>
