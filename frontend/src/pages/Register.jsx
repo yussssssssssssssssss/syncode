@@ -69,7 +69,8 @@ export default function Register() {
       const data = await res.json();
 
       if (res.ok) {
-        localStorage.setItem("user", JSON.stringify(data.user));
+  localStorage.setItem("user", JSON.stringify(data.user));
+  if (data.token) localStorage.setItem('authToken', data.token);
         navigate("/dashboard");
       } else {
         setGeneralError(data.message || "Registration failed. Please try again.");

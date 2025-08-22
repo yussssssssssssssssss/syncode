@@ -50,8 +50,9 @@ export default function Room() {
       try {
         // First, try to join the room with the code
         // If cookies are blocked on mobile, try sending socketToken as Authorization header
-        const cookies = document.cookie.split(';').reduce((acc, c) => { const [k,v] = c.split('='); acc[k?.trim()] = v; return acc; }, {});
-        const authHeader = cookies.socketToken ? `Bearer ${cookies.socketToken}` : null;
+  const cookies = document.cookie.split(';').reduce((acc, c) => { const [k,v] = c.split('='); acc[k?.trim()] = v; return acc; }, {});
+  const storedToken = localStorage.getItem('authToken');
+  const authHeader = cookies.socketToken ? `Bearer ${cookies.socketToken}` : (storedToken ? `Bearer ${storedToken}` : null);
         const joinRes = await fetch(`${BASE_URL}/api/room/join`, {
           method: "POST",
           credentials: "include",
@@ -83,10 +84,13 @@ export default function Room() {
 
         // Initialize Socket.IO connection
         console.log("Initializing Socket.IO connection...");
+        const socketAuth = {};
+        if (authHeader) socketAuth.token = authHeader.replace('Bearer ', '');
         const socketInstance = io(BASE_URL, {
            withCredentials: true,
            transports: ['websocket', 'polling'],
-           timeout: 10000
+           timeout: 10000,
+           auth: socketAuth
          });
 
         socketInstance.on("connect", () => {
