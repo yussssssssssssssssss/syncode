@@ -25,12 +25,49 @@ const roomStates = new Map();
 
 // CORS configuration - MUST be before other middleware
 app.use(cors({
-  origin: FRONTEND_URL,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    // Check if the origin is allowed
+    const allowedOrigins = [
+      FRONTEND_URL,
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'https://localhost:3000',
+      'https://localhost:5173'
+    ];
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  exposedHeaders: ['set-cookie']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: [
+    'Origin',
+    'X-Requested-With',
+    'Content-Type',
+    'Accept',
+    'Authorization',
+    'Cookie',
+    'Set-Cookie'
+  ],
+  exposedHeaders: ['Set-Cookie'],
+  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 }));
+
+// Handle preflight requests explicitly
+app.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin);
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cookie, Set-Cookie');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.sendStatus(200);
+});
 
 // Cookie parser MUST be before other middleware that uses cookies
 app.use(cookieParser());
@@ -55,9 +92,15 @@ app.use(session({
 
 // Debug middleware to log requests
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path}`);
+  console.log(`${req.method} ${req.path} - Origin: ${req.headers.origin}`);
   console.log('Cookies:', req.cookies);
   console.log('Authorization header:', req.headers.authorization);
+  
+  // Log CORS headers being set
+  if (req.method === 'OPTIONS') {
+    console.log('Preflight OPTIONS request detected');
+  }
+  
   next();
 });
 
