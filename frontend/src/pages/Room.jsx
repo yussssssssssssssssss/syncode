@@ -4,7 +4,7 @@ import { io } from "socket.io-client";
 import { BASE_URL } from "../config";
 import Header from "../components/Header";
 import CollaborativeEditor from "../components/CollaborativeEditor";
-import { FaCopy, FaCheck } from "react-icons/fa";
+import { FaCopy, FaCheck, FaMicrophone, FaMicrophoneSlash } from "react-icons/fa";
 
 export default function Room() {
   const { id: roomCode } = useParams(); // This is actually the room code, not ID
@@ -19,6 +19,10 @@ export default function Room() {
   const [connected, setConnected] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [muted, setMuted] = useState(true); // default everyone muted
+  const pcsRef = useRef(new Map()); // map of remoteSocketId -> RTCPeerConnection
+  const audioElsRef = useRef(new Map()); // map of remoteSocketId -> audio element
+  const localStreamRef = useRef(null);
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
 
@@ -105,6 +109,16 @@ export default function Room() {
           console.log("✅ Joined room:", data);
           setUsers(data.participants);
           setUserRole(data.userRole);
+          // create peer connections for existing participants
+          setTimeout(() => {
+            if (!socketInstance) return;
+            const meId = socketInstance.id;
+            data.participants.forEach(p => {
+              if (p.socketId && p.socketId !== meId && !pcsRef.current.has(p.socketId)) {
+                createPeer(p.socketId, socketInstance, false);
+              }
+            });
+          }, 0);
         });
 
         socketInstance.on("userJoined", (data) => {
@@ -115,6 +129,55 @@ export default function Room() {
             message: `${data.user.name} joined the room`,
             timestamp: new Date().toISOString()
           }]);
+        });
+
+        // WebRTC signaling handlers
+        socketInstance.on('webrtc-offer', async ({ from, sdp, fromUserId }) => {
+          try {
+            console.log('Received offer from', from);
+            let pc = pcsRef.current.get(from);
+            if (!pc) pc = createPeer(from, socketInstance, true);
+            await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+            // If we have local stream (unmuted), add tracks
+            if (localStreamRef.current) {
+              for (const track of localStreamRef.current.getTracks()) {
+                pc.addTrack(track, localStreamRef.current);
+              }
+            }
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            socketInstance.emit('webrtc-answer', { target: from, sdp: pc.localDescription });
+          } catch (e) {
+            console.error('Error handling offer', e);
+          }
+        });
+
+        socketInstance.on('webrtc-answer', async ({ from, sdp }) => {
+          try {
+            const pc = pcsRef.current.get(from);
+            if (!pc) return;
+            await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+          } catch (e) {
+            console.error('Error handling answer', e);
+          }
+        });
+
+        socketInstance.on('webrtc-ice', async ({ from, candidate }) => {
+          try {
+            const pc = pcsRef.current.get(from);
+            if (!pc || !candidate) return;
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          } catch (e) {
+            console.error('Error adding ICE candidate', e);
+          }
+        });
+
+        socketInstance.on('voice-toggle', ({ socketId, muted: remoteMuted }) => {
+          // mark user in users list as muted/unmuted based on socketId
+          setUsers(prev => prev.map(u => {
+            if (u.socketId === socketId) return { ...u, muted: remoteMuted };
+            return u;
+          }));
         });
 
         socketInstance.on("userLeft", (data) => {
@@ -160,6 +223,20 @@ export default function Room() {
         console.log("Cleaning up Socket.IO connection...");
         socket.disconnect();
       }
+      // Close peer connections and remove audio elements
+      pcsRef.current.forEach((pc, id) => {
+        try { pc.close(); } catch(e){}
+      });
+      pcsRef.current.clear();
+      audioElsRef.current.forEach((el) => {
+        try { el.pause(); el.srcObject = null; el.remove(); } catch(e){}
+      });
+      audioElsRef.current.clear();
+      // stop local stream
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(t => t.stop());
+        localStreamRef.current = null;
+      }
     };
   }, [roomCode, navigate]);
 
@@ -188,6 +265,97 @@ export default function Room() {
     }
   };
 
+  // WebRTC helpers
+  const createPeer = (remoteSocketId, socketInstance, isOfferer = false) => {
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    });
+
+    pcsRef.current.set(remoteSocketId, pc);
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        socketInstance.emit('webrtc-ice', { target: remoteSocketId, candidate: event.candidate });
+      }
+    };
+
+    pc.ontrack = (event) => {
+      const [stream] = event.streams;
+      if (!stream) return;
+      let audioEl = audioElsRef.current.get(remoteSocketId);
+      if (!audioEl) {
+        audioEl = document.createElement('audio');
+        audioEl.autoplay = true;
+        audioEl.playsInline = true;
+        audioEl.srcObject = stream;
+        audioElsRef.current.set(remoteSocketId, audioEl);
+        // Attach to DOM hidden container so autoplay policies work
+        const container = document.getElementById('audio-container');
+        if (container) container.appendChild(audioEl);
+      } else {
+        audioEl.srcObject = stream;
+      }
+    };
+
+    if (isOfferer) {
+      // if we are the offerer, and we have a local stream (unmuted), add tracks
+      if (localStreamRef.current) {
+        for (const track of localStreamRef.current.getTracks()) {
+          pc.addTrack(track, localStreamRef.current);
+        }
+      }
+      pc.createOffer().then(offer => pc.setLocalDescription(offer)).then(() => {
+        socketInstance.emit('webrtc-offer', { target: remoteSocketId, sdp: pc.localDescription });
+      }).catch(e => console.error('Offer error', e));
+    }
+
+    return pc;
+  };
+
+  const ensureLocalStream = async () => {
+    if (localStreamRef.current) return localStreamRef.current;
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // By default, mute tracks
+      s.getAudioTracks().forEach(t => t.enabled = !muted);
+      localStreamRef.current = s;
+      return s;
+    } catch (e) {
+      console.error('Microphone access denied or error:', e);
+      return null;
+    }
+  };
+
+  const toggleMute = async () => {
+    const newMuted = !muted;
+    setMuted(newMuted);
+    // ensure local stream exists
+    const s = await ensureLocalStream();
+    if (s) {
+      s.getAudioTracks().forEach(t => t.enabled = !newMuted);
+    }
+    // notify others
+    if (socket) socket.emit('voice-toggle', { muted: newMuted });
+    // add or remove tracks from existing peer connections
+    pcsRef.current.forEach((pc, remoteId) => {
+      try {
+        // remove all local senders
+        pc.getSenders().forEach(sender => {
+          if (sender.track && sender.track.kind === 'audio') pc.removeTrack(sender);
+        });
+        if (!newMuted && localStreamRef.current) {
+          localStreamRef.current.getTracks().forEach(track => pc.addTrack(track, localStreamRef.current));
+          // renegotiate by creating an offer
+          pc.createOffer().then(offer => pc.setLocalDescription(offer)).then(() => {
+            if (socket) socket.emit('webrtc-offer', { target: remoteId, sdp: pc.localDescription });
+          }).catch(e => console.error('Reoffer error', e));
+        }
+      } catch (e) {
+        console.error('Error toggling mute on pc', e);
+      }
+    });
+  };
+
   if (loading) return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
       <Header />
@@ -213,6 +381,8 @@ export default function Room() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
       <Header />
       <div className="p-6">
+  {/* hidden audio container for remote audio elements */}
+  <div id="audio-container" className="hidden" />
         <div className="bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg shadow p-6 mb-6 border border-slate-200 dark:border-slate-700 transition-colors">
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center gap-2 group">
@@ -238,6 +408,10 @@ export default function Room() {
               <span className="text-sm text-gray-600 dark:text-gray-300">
                 {connected ? 'Connected' : 'Disconnected'}
               </span>
+              <button onClick={toggleMute} className="ml-4 px-3 py-1 rounded-md bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 transition">
+                {muted ? <FaMicrophoneSlash className="inline-block mr-2" /> : <FaMicrophone className="inline-block mr-2" />} 
+                <span className="text-sm">{muted ? 'Muted' : 'Unmuted'}</span>
+              </button>
             </div>
           </div>
           {connectionError && (

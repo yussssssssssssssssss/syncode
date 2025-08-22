@@ -21,6 +21,8 @@ const prisma = require('./prisma.js');
 
 // In-memory per-room state
 const roomStates = new Map();
+// Map of userId -> array of socketIds
+const userSockets = new Map();
 
 const io = new Server(server, {
   cors: {
@@ -86,6 +88,11 @@ io.use(async (socket, next) => {
 io.on('connection', (socket) => {
   console.log(`User ${socket.userName} (${socket.userId}) connected`);
 
+  // Track socket id for this user
+  const existing = userSockets.get(socket.userId) || [];
+  existing.push(socket.id);
+  userSockets.set(socket.userId, existing);
+
   // Join room
   socket.on('joinRoom', async (roomCode) => {
     try {
@@ -125,7 +132,9 @@ io.on('connection', (socket) => {
         id: p.user.id,
         name: p.user.name,
         email: p.user.email,
-        role: p.role
+  role: p.role,
+  // include a currently-connected socket id if available (first one)
+  socketId: (userSockets.get(p.user.id) || [null])[0]
       }));
 
       // Emit user joined event to all room members
@@ -163,6 +172,29 @@ io.on('connection', (socket) => {
     } catch (error) {
       console.error('Error joining room:', error);
       socket.emit('error', { message: 'Failed to join room' });
+    }
+  });
+
+  // WebRTC signaling helpers - forward to specific socket id targets
+  socket.on('webrtc-offer', ({ target, sdp }) => {
+    if (!target) return;
+    io.to(target).emit('webrtc-offer', { from: socket.id, sdp, fromUserId: socket.userId });
+  });
+
+  socket.on('webrtc-answer', ({ target, sdp }) => {
+    if (!target) return;
+    io.to(target).emit('webrtc-answer', { from: socket.id, sdp });
+  });
+
+  socket.on('webrtc-ice', ({ target, candidate }) => {
+    if (!target) return;
+    io.to(target).emit('webrtc-ice', { from: socket.id, candidate });
+  });
+
+  // Voice mute/unmute broadcast
+  socket.on('voice-toggle', ({ muted }) => {
+    if (socket.roomCode) {
+      socket.to(socket.roomCode).emit('voice-toggle', { socketId: socket.id, muted });
     }
   });
 
@@ -241,6 +273,15 @@ io.on('connection', (socket) => {
 
   // Handle disconnection
   socket.on('disconnect', async () => {
+    // remove socket id from userSockets map
+    try {
+      const arr = userSockets.get(socket.userId) || [];
+      const filtered = arr.filter(sid => sid !== socket.id);
+      if (filtered.length > 0) userSockets.set(socket.userId, filtered);
+      else userSockets.delete(socket.userId);
+    } catch (e) {
+      console.error('Error cleaning userSockets map:', e);
+    }
     if (socket.roomCode) {
       try {
         // Get updated participants list
