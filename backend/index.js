@@ -270,7 +270,12 @@ io.on('connection', (socket) => {
 
   // WebRTC signaling payload relay
   socket.on('voice:signal', ({ targetId, signal }) => {
-    if (!targetId || !signal) return;
+    if (!targetId || !signal) return; // ignore empty
+    if (targetId === socket.id) return; // never echo to self
+    // Optionally, verify they're still in the same room/voice set
+    const roomCode = socket.roomCode;
+    const set = voiceRooms.get(roomCode);
+    if (!roomCode || !set || !set.has(targetId)) return;
     io.to(targetId).emit('voice:signal', {
       fromId: socket.id,
       user: { id: socket.userId, name: socket.userName },
