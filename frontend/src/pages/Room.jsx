@@ -4,6 +4,7 @@ import { io } from "socket.io-client";
 import { BASE_URL } from "../config";
 import Header from "../components/Header";
 import CollaborativeEditor from "../components/CollaborativeEditor";
+import VoiceChat from "../components/VoiceChat";
 import { FaCopy, FaCheck } from "react-icons/fa";
 
 export default function Room() {
@@ -291,6 +292,11 @@ export default function Room() {
                 ))}
               </div>
             </div>
+
+            {/* Voice Chat */}
+              <div className="bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg shadow p-6 mb-6 border border-slate-200 dark:border-slate-700 transition-colors">
+                <VoiceChat socket={socket} />
+              </div>
 
             {/* Chat Section */}
             <div className="bg-white dark:bg-slate-800 dark:text-slate-100 rounded-lg shadow p-6 border border-slate-200 dark:border-slate-700 transition-colors">

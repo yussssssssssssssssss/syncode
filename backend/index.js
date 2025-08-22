@@ -21,6 +21,7 @@ const prisma = require('./prisma.js');
 
 // In-memory per-room state
 const roomStates = new Map();
+const voiceRooms = new Map();
 
 const io = new Server(server, {
   cors: {
@@ -239,8 +240,72 @@ io.on('connection', (socket) => {
     }
   });
 
+  // ---------- Voice chat signaling ----------
+  //
+  function getVoiceSet(roomCode) {
+    if (!voiceRooms.has(roomCode)) voiceRooms.set(roomCode, new Set());
+    return voiceRooms.get(roomCode);
+  }
+
+  // User opts in to voice for the current room
+  socket.on('voice:join', () => {
+    const roomCode = socket.roomCode;
+    if (!roomCode) return;
+
+    const set = getVoiceSet(roomCode);
+    // Send the current peer socket IDs (others already in voice) to the joiner
+    socket.emit('voice:peers', {
+      peers: [...set],
+      you: socket.id,
+      user: { id: socket.userId, name: socket.userName }
+    });
+
+    // Add self and notify others
+    set.add(socket.id);
+    socket.to(roomCode).emit('voice:user-joined', {
+      socketId: socket.id,
+      user: { id: socket.userId, name: socket.userName }
+    });
+  });
+
+  // WebRTC signaling payload relay
+  socket.on('voice:signal', ({ targetId, signal }) => {
+    if (!targetId || !signal) return;
+    io.to(targetId).emit('voice:signal', {
+      fromId: socket.id,
+      user: { id: socket.userId, name: socket.userName },
+      signal
+    });
+  });
+
+  // Broadcast mute state so UIs can reflect it
+  socket.on('voice:mute', ({ muted }) => {
+    const roomCode = socket.roomCode;
+    if (!roomCode) return;
+    socket.to(roomCode).emit('voice:mute', {
+      socketId: socket.id,
+      user: { id: socket.userId, name: socket.userName },
+      muted: !!muted
+    });
+  });
+
+  // User leaves the voice channel explicitly
+  socket.on('voice:leave', () => {
+    const roomCode = socket.roomCode;
+    if (!roomCode) return;
+    const set = voiceRooms.get(roomCode);
+    if (set) set.delete(socket.id);
+    socket.to(roomCode).emit('voice:user-left', { socketId: socket.id });
+  });
+
   // Handle disconnection
   socket.on('disconnect', async () => {
+    const roomCode = socket.roomCode;
+    if (roomCode && voiceRooms.has(roomCode)) {
+      const set = voiceRooms.get(roomCode);
+      set.delete(socket.id);
+      socket.to(roomCode).emit('voice:user-left', { socketId: socket.id });
+    }
     if (socket.roomCode) {
       try {
         // Get updated participants list
