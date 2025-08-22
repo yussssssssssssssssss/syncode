@@ -301,6 +301,10 @@ io.on('connection', (socket) => {
   // Relay WebRTC signals
   socket.on('voice:signal', ({ roomCode, to, signal }) => {
     if (!roomCode || !to || !signal) return;
+    const set = voiceRooms.get(roomCode);
+    if (!set || !set.has(socket.id)) {
+      return socket.emit('voice:error', { message: 'Not in voice room' });
+    }
     io.to(to).emit('voice:signal', { from: socket.id, signal });
   });
 
