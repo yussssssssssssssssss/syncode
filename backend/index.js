@@ -11,6 +11,8 @@ require('dotenv').config();
 const protect = require('./middleware/auth.middleware.js');
 const authRoutes = require('./routes/auth.routes.js');
 const roomRoutes = require('./routes/room.routes.js');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const server = createServer(app);
@@ -31,6 +33,26 @@ const io = new Server(server, {
   }
 });
 
+// Simple handshake rate limiting to protect against connection floods
+const handshakeAttempts = new Map(); // ip -> { count, windowStart }
+const HANDSHAKE_WINDOW_MS = 60 * 1000; // 1 minute
+const HANDSHAKE_MAX = 40; // max connections per IP per window
+
+// Per-socket event throttling (protect against spammy signaling/chat)
+const socketEventCounters = new Map(); // socketId -> { count, windowStart }
+const EVENT_WINDOW_MS = 1000; // 1 second
+const EVENT_MAX = 20; // max events per socket per window
+
+function allowSocketEvent(socketId) {
+  const rec = socketEventCounters.get(socketId) || { count: 0, windowStart: Date.now() };
+  if (Date.now() - rec.windowStart > EVENT_WINDOW_MS) {
+    rec.count = 0; rec.windowStart = Date.now();
+  }
+  rec.count += 1;
+  socketEventCounters.set(socketId, rec);
+  return rec.count <= EVENT_MAX;
+}
+
 // Session middleware
 app.use(session({
   secret: process.env.SESSION_SECRET || 'fallback-secret',
@@ -44,10 +66,29 @@ app.use(session({
   }
 }));
 
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: false // fine-tune CSP separately in production
+}));
+// Enable HSTS (strict transport security). In development this will be a no-op if not HTTPS.
+if (helmet.hsts) app.use(helmet.hsts({ maxAge: 63072000, includeSubDomains: true, preload: true }));
+// Disable X-Powered-By header
+app.disable('x-powered-by');
+
+// Apply CORS
 app.use(cors({
   origin: FRONTEND_URL,
   credentials: true,
 }));
+
+// Basic rate limiting for all requests (protects against mass scans)
+const globalLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 200, // limit each IP to 200 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(globalLimiter);
 
 app.use(cookieParser());
 app.use(express.json());
@@ -61,6 +102,16 @@ app.use('/api/room', protect, roomRoutes);
 // Socket.IO middleware for authentication using JWT
 io.use(async (socket, next) => {
   try {
+    // basic handshake rate-limit
+    const forwarded = socket.handshake.headers['x-forwarded-for'];
+    const ip = forwarded ? forwarded.split(',')[0].trim() : (socket.handshake.address || socket.request?.connection?.remoteAddress || 'unknown');
+    const rec = handshakeAttempts.get(ip) || { count: 0, windowStart: Date.now() };
+    if (Date.now() - rec.windowStart > HANDSHAKE_WINDOW_MS) {
+      rec.count = 0; rec.windowStart = Date.now();
+    }
+    rec.count += 1;
+    handshakeAttempts.set(ip, rec);
+    if (rec.count > HANDSHAKE_MAX) return next(new Error('Too many connection attempts'));
     // Accept token from auth, Authorization, or cookies (token or socketToken)
     const cookies = cookie.parse(socket.handshake.headers.cookie || '');
     const token =
@@ -177,22 +228,26 @@ io.on('connection', (socket) => {
 
   // WebRTC signaling helpers - forward to specific socket id targets
   socket.on('webrtc-offer', ({ target, sdp }) => {
-    if (!target) return;
-    io.to(target).emit('webrtc-offer', { from: socket.id, sdp, fromUserId: socket.userId });
+  if (!target) return;
+  if (!allowSocketEvent(socket.id)) return; // rate-limit per-socket
+  io.to(target).emit('webrtc-offer', { from: socket.id, sdp, fromUserId: socket.userId });
   });
 
   socket.on('webrtc-answer', ({ target, sdp }) => {
-    if (!target) return;
-    io.to(target).emit('webrtc-answer', { from: socket.id, sdp });
+  if (!target) return;
+  if (!allowSocketEvent(socket.id)) return;
+  io.to(target).emit('webrtc-answer', { from: socket.id, sdp });
   });
 
   socket.on('webrtc-ice', ({ target, candidate }) => {
-    if (!target) return;
-    io.to(target).emit('webrtc-ice', { from: socket.id, candidate });
+  if (!target) return;
+  if (!allowSocketEvent(socket.id)) return;
+  io.to(target).emit('webrtc-ice', { from: socket.id, candidate });
   });
 
   // Voice mute/unmute broadcast
   socket.on('voice-toggle', ({ muted }) => {
+    if (!allowSocketEvent(socket.id)) return;
     if (socket.roomCode) {
       socket.to(socket.roomCode).emit('voice-toggle', { socketId: socket.id, muted });
     }
@@ -234,6 +289,7 @@ io.on('connection', (socket) => {
 
   // Handle chat messages
   socket.on('chatMessage', (message) => {
+    if (!allowSocketEvent(socket.id)) return;
     if (socket.roomCode) {
       socket.to(socket.roomCode).emit('chatMessage', {
         user: {

@@ -2,6 +2,12 @@ const prisma = require('../prisma');
 const bcrypt = require('bcryptjs');
 const generateToken = require('../utils/jwtToken');
 
+// Simple in-memory failed login tracker (suitable for small-scale; persist to DB for production)
+const failedLogins = new Map(); // key: email, value: { count, lastAttempt, lockedUntil }
+
+const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const isStrongPassword = (pw) => pw && pw.length >= 8; // basic check; consider zxcvbn for production
+
 exports.register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -10,12 +16,16 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
+    if (!isValidEmail(email)) return res.status(400).json({ message: 'Invalid email' });
+    if (!isStrongPassword(password)) return res.status(400).json({ message: 'Password must be at least 8 characters' });
+
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
       return res.status(409).json({ message: 'User already exists' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+  // increase bcrypt rounds for stronger hashing (12 rounds)
+  const hashedPassword = await bcrypt.hash(password, 12);
 
     const user = await prisma.user.create({
       data: { name, email, password: hashedPassword }
@@ -70,11 +80,38 @@ exports.login = async (req, res) => {
     if (!email || !password)
       return res.status(400).json({ message: 'All fields are required' });
 
+    if (!isValidEmail(email)) return res.status(400).json({ message: 'Invalid email' });
+
+    // Check lockout
+    const record = failedLogins.get(email) || { count: 0 };
+    if (record.lockedUntil && record.lockedUntil > Date.now()) {
+      const secs = Math.ceil((record.lockedUntil - Date.now()) / 1000);
+      return res.status(429).json({ message: `Too many failed attempts. Try again in ${secs}s` });
+    }
+
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+    if (!user) {
+      // increment failed count
+      const prev = failedLogins.get(email) || { count: 0 };
+      prev.count = (prev.count || 0) + 1;
+      prev.lastAttempt = Date.now();
+      if (prev.count >= 5) prev.lockedUntil = Date.now() + (15 * 60 * 1000); // lock 15 minutes
+      failedLogins.set(email, prev);
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
+    if (!isMatch) {
+      const prev = failedLogins.get(email) || { count: 0 };
+      prev.count = (prev.count || 0) + 1;
+      prev.lastAttempt = Date.now();
+      if (prev.count >= 5) prev.lockedUntil = Date.now() + (15 * 60 * 1000);
+      failedLogins.set(email, prev);
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // reset failed login on success
+    if (failedLogins.has(email)) failedLogins.delete(email);
 
     const token = generateToken(user);
 
