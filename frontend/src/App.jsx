@@ -14,7 +14,7 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/room/:id" element={<Room />} />
-      {/* <Analytics /> */}
+      <Analytics />
     </Routes>
   );
 }
