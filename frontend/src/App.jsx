@@ -4,6 +4,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Room from "./pages/Room";
 import Landing from "./pages/Landing";
+import { Analytics } from "@vercel/analytics/next"
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/room/:id" element={<Room />} />
+      <Analytics />
     </Routes>
   );
 }
